@@ -1,0 +1,25 @@
+{
+  "name": "rodziu/php-git",
+  "description": "Pure PHP Git client (read only).",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Mateusz Rohde",
+      "email": "mateusz.rohde@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Rodziu\\Git\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Rodziu\\Git\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">7.1"
+  }
+}

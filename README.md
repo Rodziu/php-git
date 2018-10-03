@@ -1,0 +1,1 @@
+# Pure PHP GIT readonly client
