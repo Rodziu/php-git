@@ -4,8 +4,84 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "89b614197fbf314f4ddae9348001dfcf",
-    "packages": [],
+    "content-hash": "b2e077d69b680d19a4e948917b1a912c",
+    "packages": [
+        {
+            "name": "rodziu/generic-types",
+            "version": "1.3.0",
+            "source": {
+                "type": "git",
+                "url": "git@bitbucket.org:Rodziu/genericTypes.git",
+                "reference": "871489a1047cdd70c430cbacfaa9784d92640597"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.widzserv.net.pl/dist/rodziu/generic-types/rodziu-generic-types-1.3.0-a6e2f8.zip",
+                "reference": "871489a1047cdd70c430cbacfaa9784d92640597",
+                "shasum": "1a8b0bc39cdeed9fc9c09aab352c42ef7bf480f8"
+            },
+            "require": {
+                "php": "^7.1.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rodziu\\GenericTypes\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Rodziu\\GenericTypes\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mateusz Rohde",
+                    "email": "mateusz.rohde@widzialni.pl"
+                }
+            ],
+            "description": "Generic Array Objects for PHP!",
+            "time": "2018-06-07T10:41:33+00:00"
+        },
+        {
+            "name": "widzialnipl/curl",
+            "version": "1.3.3",
+            "source": {
+                "type": "git",
+                "url": "git@bitbucket.org:WidzialniPL/curl.git",
+                "reference": "924ff6c62ac26f2d2cd2b39f2e43d37d24955eb0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://packages.widzserv.net.pl/dist/widzialnipl/curl/widzialnipl-curl-1.3.3-026b5d.zip",
+                "reference": "924ff6c62ac26f2d2cd2b39f2e43d37d24955eb0",
+                "shasum": "01e50bd2926888dcddf6daba11ff55058882f847"
+            },
+            "require": {
+                "php": ">=5.4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "WidzialniPL\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Mateusz Rohde",
+                    "email": "mateusz.rohde@widzialni.pl"
+                }
+            ],
+            "description": "cURL wrapper class",
+            "time": "2017-12-04T15:28:10+00:00"
+        }
+    ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
@@ -13,7 +89,9 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">7.1"
+        "php": ">7.1",
+        "ext-zlib": "*",
+        "ext-zip": "*"
     },
     "platform-dev": []
 }

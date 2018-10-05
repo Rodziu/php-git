@@ -20,6 +20,10 @@
     }
   },
   "require": {
-    "php": ">7.1"
+    "php": ">7.1",
+    "ext-curl": "*",
+    "ext-zlib": "*",
+    "rodziu/generic-types": "^1.3",
+    "widzialnipl/curl": "^1.3"
   }
 }
