@@ -68,13 +68,14 @@ class Pack implements \IteratorAggregate{
 	 */
 	public function getIterator(): \Generator{
 		$header = $this->open();
+		fseek($this->packFileHandle, 12);
 		$index = [];
 		$cnt = 0;
 		$objectOffset = ftell($this->packFileHandle);
 		do{
 			$object = $this->unpackObject($objectOffset, $index);
 			yield $object;
-			$index[$object->getSha1()] = $object;
+			$index[$object->getSha1()] = $objectOffset;
 			$objectOffset = ftell($this->packFileHandle);
 			++$cnt;
 		}while($cnt < $header['objectCount']);
@@ -140,38 +141,42 @@ class Pack implements \IteratorAggregate{
 		$size = bindec($size);
 		$refObject = null;
 		//
-		if($type === 7){ // ref delta
-			$dd = fread($this->packFileHandle, 20);
-			$dataOffset = ftell($this->packFileHandle);
-			$refSHA = (unpack('H*', $dd)[1]);
-			if($runtimeIndex !== null){
-				$refObject = $runtimeIndex[$refSHA];
-			}else{
-				$refObject = $this->getPackedObject($refSHA);
-				fseek($this->packFileHandle, $dataOffset);
-			}
-		}else{
-			$dataOffset = ftell($this->packFileHandle);
-		}
 		if($type === 6){ // ofs delta
-			$buf = fread($this->packFileHandle, $size + 128 + 20);
-			$pos = 0;
 			$deltaOffset = -1;
 			do{
 				$deltaOffset++;
-				$c = ord($buf{$pos++});
+				$c = ord(fgetc($this->packFileHandle));
 				$deltaOffset = ($deltaOffset << 7) + ($c & 0x7F);
 			}while($c & 0x80);
-			$dataOffset += $pos;
-			$data = gzuncompress(substr($buf, $pos), $size);
-			unset($buf);
 			$baseOffset = $offset - $deltaOffset;
+			//
+			$dataOffset = ftell($this->packFileHandle);
 			$refObject = $this->unpackObject($baseOffset);
-		}else{
-			// decode object contents
-			$data = fread($this->packFileHandle, $size + 128);
-			$data = gzuncompress($data);
+			// set internal file pointer back to last position
+			fseek($this->packFileHandle, $dataOffset);
+		}else if($type === 7){ // ref delta
+			$dd = fread($this->packFileHandle, 20);
+			$refSHA = unpack('H*', $dd)[1];
+			$dataOffset = ftell($this->packFileHandle);
+			if($runtimeIndex !== null){
+				$refObject = $this->unpackObject($runtimeIndex[$refSHA], $runtimeIndex);
+			}else{
+				$refObject = $this->getPackedObject($refSHA);
+			}
+			// set internal file pointer back to last position
+			fseek($this->packFileHandle, $dataOffset);
 		}
+		// decode object contents
+		$gz = inflate_init(ZLIB_ENCODING_DEFLATE);
+		$data = '';
+		do{
+			$data .= $decoded = @inflate_add($gz, fgetc($this->packFileHandle));
+			$status = inflate_get_status($gz);
+			if($status == ZLIB_STREAM_END){
+				break;
+			}
+		}while($decoded !== false);
+		//
 		if($type === 6 || $type === 7){ // apply delta
 			$object = new GitObject(
 				$refObject->getType(),
@@ -179,10 +184,6 @@ class Pack implements \IteratorAggregate{
 			);
 		}else{
 			$object = new GitObject($type, $data, $size);
-		}
-		if($runtimeIndex !== null){
-			// set internal pointer position to end of current object
-			fseek($this->packFileHandle, $dataOffset + strlen(gzcompress($data)));
 		}
 		return $object;
 	}
