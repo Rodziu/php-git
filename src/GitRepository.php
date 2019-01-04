@@ -266,4 +266,22 @@ class GitRepository{
 		}
 		return new ArrayOfGitCommit(...$commits);
 	}
+
+	/**
+	 * Save git object to filesystem if it doesn't already exist
+	 *
+	 * @param GitObject $gitObject
+	 */
+	public function saveGitObject(GitObject $gitObject){
+		$path = $this->gitRepoPath.DIRECTORY_SEPARATOR.'objects'.DIRECTORY_SEPARATOR
+			.substr($gitObject->getSha1(), 0, 2);
+		$objectFile = substr($gitObject->getSha1(), 2);
+		if(!file_exists($path.DIRECTORY_SEPARATOR.$objectFile)){
+			@mkdir($path);
+			file_put_contents(
+				$path.DIRECTORY_SEPARATOR.$objectFile,
+				gzcompress((string)$gitObject)
+			);
+		}
+	}
 }

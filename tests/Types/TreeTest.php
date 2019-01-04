@@ -12,58 +12,62 @@ use Rodziu\Git\TestsHelper;
  */
 class TreeTest extends TestCase{
 	/**
-	 * @var Tree
+	 * @var GitObject
 	 */
-	private $tree;
+	private $gitObject;
 
 	/**
 	 */
 	public function setUp(){
 		parent::setUp();
 		/** @noinspection SpellCheckingInspection */
-		$gitObject = GitObject::createFromFile(
+		$this->gitObject = GitObject::createFromFile(
 			implode(DIRECTORY_SEPARATOR, [
 				TestsHelper::GIT_TEST_PATH,
 				'.git', 'objects', '80', 'c89636379e7432af7a1d185dcab15a207ec69d'
 			])
 		);
-		$git = new GitRepository(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'.git');
-		$this->tree = new Tree($gitObject, $git);
 	}
 
 	/**
 	 */
-	public function testGetIterator(){
+	public function testFromGitObject(){
+		$tree = Tree::fromGitObject($this->gitObject);
 		$ret = [];
 		/** @var TreeBranch $branch */
-		foreach($this->tree as $branch){
+		foreach($tree as $branch){
 			$ret[] = [
-				$branch->getMode(), $branch->getObject()->getTypeName(), $branch->getObject()->getSha1(),
+				$branch->getMode(), $branch->getHash(),
 				$branch->getName()
 			];
 		}
 		/** @noinspection SpellCheckingInspection */
 		self::assertSame([
-			[644, 'blob', '2b50af3d214b6b49735c4df3d54adee265f43f51', '.git-changelog'],
-			[644, 'blob', '69fe54ed84d7ba9ca428ca7dd1b19cceb2d4a2be', 'file'],
-			[644, 'blob', 'f3c77b12c6c1a59b79d4a86b6e05ea57b1e45d84', 'file2'],
-			[644, 'blob', 'd033d51983536e2d623b34c246afdd1a6e11d09f', 'file3'],
-			[644, 'blob', 'c367783755ca8487c9de574d189a43de5b606b06', 'fileOnBranch'],
-			[644, 'blob', 'f48a363a2b2aa305c172f64f1f675ff7a4920a6c', 'pack.idx'],
-			[644, 'blob', '2591f0ea09dd1ab5183a6a4ff7b7545b7941bfaf', 'pack.pack'],
-			[644, 'blob', '6bf5a82c80e5a02a43d74a90ca0ceed372b29f94', 'secondFileOnBranch'],
-			[000, 'tree', 'cd5ed3bff843b3cf2a91fc50c90c365dcdc2a0ca', 'test'],
+			[644, '2b50af3d214b6b49735c4df3d54adee265f43f51', '.git-changelog'],
+			[644, '69fe54ed84d7ba9ca428ca7dd1b19cceb2d4a2be', 'file'],
+			[644, 'f3c77b12c6c1a59b79d4a86b6e05ea57b1e45d84', 'file2'],
+			[644, 'd033d51983536e2d623b34c246afdd1a6e11d09f', 'file3'],
+			[644, 'c367783755ca8487c9de574d189a43de5b606b06', 'fileOnBranch'],
+			[644, 'f48a363a2b2aa305c172f64f1f675ff7a4920a6c', 'pack.idx'],
+			[644, '2591f0ea09dd1ab5183a6a4ff7b7545b7941bfaf', 'pack.pack'],
+			[644, '6bf5a82c80e5a02a43d74a90ca0ceed372b29f94', 'secondFileOnBranch'],
+			[000, 'cd5ed3bff843b3cf2a91fc50c90c365dcdc2a0ca', 'test'],
 		], $ret);
 	}
 
 	/**
 	 */
 	public function testWalkRecursive(){
+		$tree = Tree::fromGitObject($this->gitObject);
 		$ret = [];
-		/** @var TreeBranch $branch */
-		foreach($this->tree->walkRecursive() as $path => $branch){
+		/** @var TreeBranch $branch
+		 *	@var GitObject $gitObject
+		 */
+		foreach($tree->walkRecursive(
+			new GitRepository(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'.git')
+		) as list($path, $branch, $gitObject)){
 			$ret[] = [
-				$branch->getMode(), $branch->getObject()->getTypeName(), $branch->getObject()->getSha1(),
+				$branch->getMode(), $gitObject->getTypeName(), $branch->getHash(),
 				$branch->getName(), $path
 			];
 		}

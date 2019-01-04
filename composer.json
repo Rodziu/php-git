@@ -23,7 +23,11 @@
     "php": ">7.2",
     "ext-curl": "*",
     "ext-zlib": "*",
+    "rodziu/datetimelocalized": "^2.0",
     "rodziu/generic-types": "^1.3",
     "widzialnipl/curl": "^1.3"
+  },
+  "require-dev": {
+    "ext-zip": "*"
   }
 }

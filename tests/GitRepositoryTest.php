@@ -13,6 +13,7 @@
 namespace Rodziu\Git;
 
 use PHPUnit\Framework\TestCase;
+use Rodziu\DateTimeLocalized\DateTimeImmutable;
 use Rodziu\GenericTypes\ArrayOfString;
 use Rodziu\Git\Types\HEAD;
 use Rodziu\Git\Types\Tag;
@@ -83,7 +84,7 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('b534ef510fc478df9e7c14593b7214abbe2d4e78'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new \DateTimeImmutable('2017-06-06 13:00:53.000000', new \DateTimeZone('+02:00')),
+				'date'          => new DateTimeImmutable('2017-06-06 13:00:53.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
 				'message'       => "first commit line\nsecond commit line\nthird commit line"
@@ -94,7 +95,7 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('bd5785f3aa2e35c60f70e4df8ef97613a43391b4', '8dfb1dd06eef93b66d5b42df8ade9662fa41b752'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new \DateTimeImmutable('2017-06-06 10:56:07.000000', new \DateTimeZone('+02:00')),
+				'date'          => new DateTimeImmutable('2017-06-06 10:56:07.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
 				'message'       => "Merge branch 'someBranch'"
@@ -105,7 +106,7 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('7f1abf9c92388346c662ae67665ad040e7f88e8b'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new \DateTimeImmutable('2017-06-08 14:19:17.000000', new \DateTimeZone('+02:00')),
+				'date'          => new DateTimeImmutable('2017-06-08 14:19:17.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
 				'message'       => 'branch'

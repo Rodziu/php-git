@@ -130,16 +130,14 @@ class GitClone{
 	 */
 	protected function checkout(string $repositoryPath, string $head){
 		$git = new GitRepository($repositoryPath);
-		$tree = new Tree(
-			$git->getObject($git->getCommit($head)->tree), $git
-		);
+		$tree = Tree::fromGitObject($git->getObject($git->getCommit($head)->tree));
 		/** @var TreeBranch $branch */
-		foreach($tree->walkRecursive() as $path => $branch){
+		foreach($tree->walkRecursive($git) as list($path, $branch, $object)){
 			$path = $this->destination.DIRECTORY_SEPARATOR.$path.$branch->getName();
 			if($branch->getMode() === 0){
 				mkdir($path, 0755);
 			}else{
-				file_put_contents($path, $branch->getObject()->getData());
+				file_put_contents($path, $object->getData());
 				if($branch->getMode() === 755){
 					chmod($path, 0755);
 				}

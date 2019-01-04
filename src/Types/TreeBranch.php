@@ -18,21 +18,21 @@ class TreeBranch extends GenericStructure{
 	 */
 	protected $mode;
 	/**
-	 * @var GitObject
+	 * @var string
 	 */
-	protected $object;
+	protected $hash;
 
 	/**
 	 * TreeBranch constructor.
 	 *
 	 * @param string $name
 	 * @param int $mode
-	 * @param GitObject $object
+	 * @param string $hash
 	 */
-	public function __construct(string $name, int $mode, GitObject $object){
+	public function __construct(string $name, int $mode, string $hash){
 		$this->name = $name;
 		$this->mode = $mode;
-		$this->object = $object;
+		$this->hash = $hash;
 	}
 
 	/**
@@ -50,9 +50,9 @@ class TreeBranch extends GenericStructure{
 	}
 
 	/**
-	 * @return GitObject
+	 * @return string
 	 */
-	public function getObject(): GitObject{
-		return $this->object;
+	public function getHash(): string{
+		return $this->hash;
 	}
 }

@@ -4,8 +4,45 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b2e077d69b680d19a4e948917b1a912c",
+    "content-hash": "7da3673b66232890326d7e67f20f867e",
     "packages": [
+        {
+            "name": "rodziu/datetimelocalized",
+            "version": "2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://bitbucket.org/Rodziu/datetimelocalized.git",
+                "reference": "a72335dc33f031a6ec10d46d22844be5d8bc5087"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://bitbucket.org/Rodziu/datetimelocalized/get/a72335dc33f031a6ec10d46d22844be5d8bc5087.zip",
+                "reference": "a72335dc33f031a6ec10d46d22844be5d8bc5087",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rodziu\\DateTimeLocalized\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mateusz Rohde",
+                    "email": "mateusz.rohde@gmail.com"
+                }
+            ],
+            "description": "Localized version of PHP DateTime objects.",
+            "homepage": "https://bitbucket.org/Rodziu/datetimelocalized",
+            "time": "2018-04-19T09:00:03+00:00"
+        },
         {
             "name": "rodziu/generic-types",
             "version": "1.3.0",
@@ -89,9 +126,11 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">7.1",
-        "ext-zlib": "*",
-        "ext-zip": "*"
+        "php": ">7.2",
+        "ext-curl": "*",
+        "ext-zlib": "*"
     },
-    "platform-dev": []
+    "platform-dev": {
+        "ext-zip": "*"
+    }
 }

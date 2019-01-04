@@ -12,6 +12,7 @@
 
 namespace Rodziu\Git\Types;
 
+use Rodziu\DateTimeLocalized\DateTimeImmutable;
 use Rodziu\GenericTypes\ArrayOfString;
 use Rodziu\GenericTypes\GenericStructure;
 use Rodziu\Git\GitException;
@@ -42,7 +43,7 @@ class Commit extends GenericStructure{
 	 */
 	public $authorMail = "";
 	/**
-	 * @var \DateTimeImmutable
+	 * @var DateTimeImmutable
 	 */
 	public $date;
 	/**
@@ -64,7 +65,7 @@ class Commit extends GenericStructure{
 	 * @param string $commitHash
 	 * @param string $tree
 	 * @param ArrayOfString $parents
-	 * @param \DateTimeImmutable $date
+	 * @param DateTimeImmutable $date
 	 * @param string $authorName
 	 * @param string $authorMail
 	 * @param string $committerName
@@ -72,7 +73,7 @@ class Commit extends GenericStructure{
 	 * @param string $message
 	 */
 	public function __construct(
-		string $commitHash, string $tree, ArrayOfString $parents, \DateTimeImmutable $date, string $authorName, string $authorMail,
+		string $commitHash, string $tree, ArrayOfString $parents, DateTimeImmutable $date, string $authorName, string $authorMail,
 		string $committerName, string $committerMail, string $message
 	){
 		$this->commitHash = $commitHash;
@@ -118,7 +119,7 @@ class Commit extends GenericStructure{
 							$m
 						)){
 							try{
-								$array['date'] = (new \DateTimeImmutable(
+								$array['date'] = (new DateTimeImmutable(
 									'',
 									new \DateTimeZone($m['offset'])
 								))->setTimestamp($m['timestamp']);
@@ -164,7 +165,7 @@ class Commit extends GenericStructure{
 							$m
 						)){
 							try{
-								$array['date'] = (new \DateTimeImmutable(
+								$array['date'] = (new DateTimeImmutable(
 									'',
 									new \DateTimeZone($m['offset'])
 								))->setTimestamp($m['timestamp']);
@@ -183,5 +184,23 @@ class Commit extends GenericStructure{
 		$array['message'] = implode("\n", $array['message']);
 		/** @noinspection PhpIncompatibleReturnTypeInspection */
 		return self::fromArray($array);
+	}
+
+	/**
+	 * @return string
+	 */
+	public function __toString(): string{
+		$data = "tree {$this->tree}";
+		foreach($this->parents as $parent){
+			$data .= "\nparent $parent";
+		}
+		$tzOffset = $this->date->getOffset() / 36;
+		$tzOffset = ($tzOffset > 0 ? '+' : '-')
+			.str_pad($tzOffset, 4, '0', STR_PAD_LEFT);
+		$time = "{$this->date->getTimestamp()} $tzOffset";
+		$data .= "\nauthor {$this->authorName} <{$this->authorMail}> $time";
+		$data .= "\ncommitter {$this->committerName} <{$this->committerMail}> $time";
+		$data .= "\n\n{$this->message}\n";
+		return $data;
 	}
 }
