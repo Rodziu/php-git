@@ -84,9 +84,10 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('b534ef510fc478df9e7c14593b7214abbe2d4e78'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new DateTimeImmutable('2017-06-06 13:00:53.000000', new \DateTimeZone('+02:00')),
+				'authorDate'    => new DateTimeImmutable('2017-06-06 13:00:53.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
+				'commitDate'    => new DateTimeImmutable('2017-06-06 13:00:53.000000', new \DateTimeZone('+02:00')),
 				'message'       => "first commit line\nsecond commit line\nthird commit line"
 			]],
 			'b679aa263412e259e97e7687d6f8286bbac43be6' => ['b679aa263412e259e97e7687d6f8286bbac43be6', [
@@ -95,9 +96,10 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('bd5785f3aa2e35c60f70e4df8ef97613a43391b4', '8dfb1dd06eef93b66d5b42df8ade9662fa41b752'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new DateTimeImmutable('2017-06-06 10:56:07.000000', new \DateTimeZone('+02:00')),
+				'authorDate'    => new DateTimeImmutable('2017-06-06 10:56:07.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
+				'commitDate'    => new DateTimeImmutable('2017-06-06 10:56:07.000000', new \DateTimeZone('+02:00')),
 				'message'       => "Merge branch 'someBranch'"
 			]],
 			'b931c2fe4ad701ca4e4839ce5d729bdeb667e681' => ['b931c2fe4ad701ca4e4839ce5d729bdeb667e681', [
@@ -106,10 +108,23 @@ class GitRepositoryTest extends TestCase{
 				'parents'       => new ArrayOfString('7f1abf9c92388346c662ae67665ad040e7f88e8b'),
 				'authorName'    => 'Mateusz Rohde',
 				'authorMail'    => 'mateusz.rohde@gmail.com',
-				'date'          => new DateTimeImmutable('2017-06-08 14:19:17.000000', new \DateTimeZone('+02:00')),
+				'authorDate'    => new DateTimeImmutable('2017-06-08 14:19:17.000000', new \DateTimeZone('+02:00')),
 				'committerName' => 'Mateusz Rohde',
 				'committerMail' => 'mateusz.rohde@gmail.com',
+				'commitDate'    => new DateTimeImmutable('2017-06-08 14:19:17.000000', new \DateTimeZone('+02:00')),
 				'message'       => 'branch'
+			]],
+			'5cce24046b2cc50eb9d32159d36975433badd456' => ['5cce24046b2cc50eb9d32159d36975433badd456', [
+				'commitHash'    => '5cce24046b2cc50eb9d32159d36975433badd456',
+				'tree'          => 'ffb28d71f9ebd4e8a41271f93a3d10e09e682829',
+				'parents'       => new ArrayOfString('a3e6e3bfb5066f12bf2d52a9e5317fbe161d3c06'),
+				'authorName'    => 'Mateusz Rohde',
+				'authorMail'    => 'mateusz.rohde@gmail.com',
+				'authorDate'    => new DateTimeImmutable('2017-06-09 11:42:28.000000', new \DateTimeZone('+02:00')),
+				'committerName' => 'Mateusz Rohde',
+				'committerMail' => 'mateusz.rohde@gmail.com',
+				'commitDate'    => new DateTimeImmutable('2017-06-09 11:49:15.000000', new \DateTimeZone('+02:00')),
+				'message'       => 'commit'
 			]],
 		];
 	}

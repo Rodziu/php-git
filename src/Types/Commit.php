@@ -45,7 +45,7 @@ class Commit extends GenericStructure{
 	/**
 	 * @var DateTimeImmutable
 	 */
-	public $date;
+	public $authorDate;
 	/**
 	 * @var string
 	 */
@@ -54,6 +54,10 @@ class Commit extends GenericStructure{
 	 * @var string
 	 */
 	public $committerMail = "";
+	/**
+	 * @var DateTimeImmutable
+	 */
+	public $commitDate;
 	/**
 	 * @var string
 	 */
@@ -65,25 +69,29 @@ class Commit extends GenericStructure{
 	 * @param string $commitHash
 	 * @param string $tree
 	 * @param ArrayOfString $parents
-	 * @param DateTimeImmutable $date
 	 * @param string $authorName
 	 * @param string $authorMail
+	 * @param DateTimeImmutable $authorDate
 	 * @param string $committerName
 	 * @param string $committerMail
+	 * @param DateTimeImmutable $commitDate
 	 * @param string $message
 	 */
 	public function __construct(
-		string $commitHash, string $tree, ArrayOfString $parents, DateTimeImmutable $date, string $authorName, string $authorMail,
-		string $committerName, string $committerMail, string $message
+		string $commitHash, string $tree, ArrayOfString $parents,
+		string $authorName, string $authorMail, DateTimeImmutable $authorDate,
+		string $committerName, string $committerMail, DateTimeImmutable $commitDate,
+		string $message
 	){
 		$this->commitHash = $commitHash;
 		$this->tree = $tree;
 		$this->parents = $parents;
-		$this->date = $date;
 		$this->authorName = $authorName;
 		$this->authorMail = $authorMail;
+		$this->authorDate = $authorDate;
 		$this->committerName = $committerName;
 		$this->committerMail = $committerMail;
+		$this->commitDate = $commitDate;
 		$this->message = $message;
 	}
 
@@ -98,45 +106,7 @@ class Commit extends GenericStructure{
 				"Expected GitObject of type `commit`, `{$gitObject->getTypeName()}` given"
 			);
 		}
-		$commit = explode("\n", $gitObject->getData());
-		$array = [
-			'commitHash' => $gitObject->getSha1(), 'parents' => new ArrayOfString(...[]), 'message' => []
-		];
-		foreach($commit as $line){
-			if(preg_match('#^(tree|parent|author|committer)\s(.*)$#', $line, $match)){
-				switch($match[1]){
-					case 'tree':
-						$array['tree'] = $match[2];
-						break;
-					case 'parent':
-						$array['parents'][] = $match[2];
-						break;
-					case 'author':
-					case 'committer':
-						if(preg_match(/** @lang text */
-							"#(?<name>.+)\s<(?<mail>[^>]+)>\s(?<timestamp>\d+)\s(?<offset>[+-]\d{4})#",
-							$match[2],
-							$m
-						)){
-							try{
-								$array['date'] = (new DateTimeImmutable(
-									'',
-									new \DateTimeZone($m['offset'])
-								))->setTimestamp($m['timestamp']);
-							}catch(\Exception $e){
-								throw new \LogicException($e);
-							}
-							$array[$match[1].'Name'] = $m['name'];
-							$array[$match[1].'Mail'] = $m['mail'];
-						}
-						break;
-				}
-			}else if(!empty($line)){
-				$array['message'][] = $line;
-			}
-		}
-		$array['message'] = implode("\n", $array['message']);
-		return self::fromArray($array);
+		return self::fromCommitString($gitObject->getSha1(), $gitObject->getData());
 	}
 
 	/**
@@ -147,7 +117,7 @@ class Commit extends GenericStructure{
 	 */
 	public static function fromCommitString(string $commitHash, string $commit): self{
 		$commit = explode("\n", $commit);
-		$array = ['commitHash' => $commitHash, 'parents' => new ArrayOfString(...[]), 'message' => []];
+		$array = ['commitHash' => $commitHash, 'parents' => new ArrayOfString(), 'message' => []];
 		foreach($commit as $line){
 			if(preg_match('#^(tree|parent|author|committer)\s(.*)$#', $line, $match)){
 				switch($match[1]){
@@ -165,7 +135,7 @@ class Commit extends GenericStructure{
 							$m
 						)){
 							try{
-								$array['date'] = (new DateTimeImmutable(
+								$array[$match[1] === 'author' ? 'authorDate' : 'commitDate'] = (new DateTimeImmutable(
 									'',
 									new \DateTimeZone($m['offset'])
 								))->setTimestamp($m['timestamp']);
@@ -194,12 +164,14 @@ class Commit extends GenericStructure{
 		foreach($this->parents as $parent){
 			$data .= "\nparent $parent";
 		}
-		$tzOffset = $this->date->getOffset() / 36;
-		$tzOffset = ($tzOffset > 0 ? '+' : '-')
-			.str_pad($tzOffset, 4, '0', STR_PAD_LEFT);
-		$time = "{$this->date->getTimestamp()} $tzOffset";
-		$data .= "\nauthor {$this->authorName} <{$this->authorMail}> $time";
-		$data .= "\ncommitter {$this->committerName} <{$this->committerMail}> $time";
+		$getTime = function(DateTimeImmutable $date){
+			$tzOffset = $date->getOffset() / 36;
+			$tzOffset = ($tzOffset > 0 ? '+' : '-')
+				.str_pad($tzOffset, 4, '0', STR_PAD_LEFT);
+			return "{$date->getTimestamp()} $tzOffset";
+		};
+		$data .= "\nauthor {$this->authorName} <{$this->authorMail}> {$getTime($this->authorDate)}";
+		$data .= "\ncommitter {$this->committerName} <{$this->committerMail}> {$getTime($this->commitDate)}";
 		$data .= "\n\n{$this->message}\n";
 		return $data;
 	}
