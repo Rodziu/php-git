@@ -221,6 +221,13 @@ class Pack implements \IteratorAggregate{
 	 */
 	protected function applyDelta($delta, $base){
 		$pos = 0;
+		$getCode = function() use (&$pos, $delta){
+			return ord($delta{$pos++});
+		};
+		$getBin = function($number) {
+			return str_pad(decbin($number), 8, '0', STR_PAD_LEFT);
+		};
+
 		$gitVarInt = function($str, &$pos = 0){
 			$r = 0;
 			$c = 0x80;
@@ -230,43 +237,34 @@ class Pack implements \IteratorAggregate{
 			}
 			return $r;
 		};
-		$gitVarInt($delta, $pos);
-		$gitVarInt($delta, $pos);
-		$r = '';
-		while($pos < strlen($delta)){
-			$opCode = ord($delta{$pos++});
-			if($opCode & 0x80){
-				/* copy a part of $base */
-				$off = 0;
-				if($opCode & 0x01){
-					$off = ord($delta{$pos++});
+		$gitVarInt($delta, $pos); // base size
+		$gitVarInt($delta, $pos); // result size
+		$result = '';
+			while(isset($delta[$pos])){
+				$opCode = $getCode();
+				$opCodeBin = $getBin($opCode);
+				if($opCodeBin[0]){
+					// copy
+					$offset = $length = '';
+					for($i = 7; $i > 1; $i--){
+						$cur = $getBin($opCodeBin[$i] ? $getCode() : 0);
+						if($i > 3){ // offset bytes
+							$offset = $cur.$offset;
+						}else{ // length bytes
+							$length = $cur.$length;
+						}
+					}
+					$offset = bindec($offset);
+					$length = bindec($length);
+					if ($length === 0) {
+						$length = 65536;
+					}
+					$result .= substr($base, $offset, $length);
+				}else{
+					$result .= substr($delta, $pos, $opCode);
+					$pos += $opCode;
 				}
-				if($opCode & 0x02){
-					$off |= ord($delta{$pos++}) << 8;
-				}
-				if($opCode & 0x04){
-					$off |= ord($delta{$pos++}) << 16;
-				}
-				if($opCode & 0x08){
-					$off |= ord($delta{$pos++}) << 24;
-				}
-				$len = 0;
-				if($opCode & 0x10){
-					$len = ord($delta{$pos++});
-				}
-				if($opCode & 0x20){
-					$len |= ord($delta{$pos++}) << 8;
-				}
-				if($opCode & 0x40){
-					$len |= ord($delta{$pos++}) << 16;
-				}
-				$r .= substr($base, $off, $len);
-			}else{
-				/* take the next $opCode bytes as they are */
-				$r .= substr($delta, $pos, $opCode);
-				$pos += $opCode;
 			}
-		}
-		return $r;
+		return $result;
 	}
 }

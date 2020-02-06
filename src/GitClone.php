@@ -56,16 +56,22 @@ class GitClone{
 			$response = explode("\n", $data[0]);
 			$lines = count($response);
 			$gitPath = $this->destination.DIRECTORY_SEPARATOR.'.git'.DIRECTORY_SEPARATOR;
-			if(preg_match('#symref=HEAD:([^ ]+)#', $response[0], $match)){
-				$head = $match[1];
-				file_put_contents(
-					$gitPath.'HEAD',
-					"ref: $head\n"
-				);
-			}else{
+			$lastLine = 0;
+			$head = null;
+			foreach($response as $k => $r){
+				if(preg_match('#symref=HEAD:([^ ]+)#', $r, $match)){
+					$head = $match[1];
+					file_put_contents(
+						$gitPath.'HEAD',
+						"ref: $head\n"
+					);
+					$lastLine = $k;
+				}
+			}
+			if($head === null){
 				throw new GitException("Failed to match HEAD");
 			}
-			for($i = 1; $i < $lines; $i++){
+			for($i = $lastLine + 1; $i < $lines; $i++){
 				$line = explode(" ", substr($response[$i], 4));
 				if(count($line) === 2){
 					$dir = $gitPath.dirname($line[1]);
@@ -92,7 +98,7 @@ class GitClone{
 	protected function fetchObjects(string $head){
 		$c = new Curl();
 		$c->init("{$this->url}/git-upload-pack", true, [
-			CURLOPT_USERAGENT  => 'git/2.10.5',
+			CURLOPT_USERAGENT  => 'git/2.20.1',
 			CURLOPT_HTTPHEADER => ['Content-Type: application/x-git-upload-pack-request']
 		]);
 		$c->setPost("0032want $head\n00000032have 0000000000000000000000000000000000000000\n0009done\n");
