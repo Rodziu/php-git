@@ -4,7 +4,7 @@ Readonly GIT client implementation, that allows one to read GIT repository data 
 
 ## Prerequisites
 
-- PHP ^7.1,
+- PHP ^7.2,
 - ext-zlib - to properly decompress git objects.
 
 ## Features

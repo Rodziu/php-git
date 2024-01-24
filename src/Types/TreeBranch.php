@@ -2,57 +2,40 @@
 
 namespace Rodziu\Git\Types;
 
-use Rodziu\GenericTypes\GenericStructure;
+class TreeBranch
+{
+    /**
+     * @var string
+     */
+    protected $name;
+    /**
+     * @var int
+     */
+    protected $mode;
+    /**
+     * @var string
+     */
+    protected $hash;
 
-/**
- * Class TreeBranch
- * @package Rodziu\Git\Types
- */
-class TreeBranch extends GenericStructure{
-	/**
-	 * @var string
-	 */
-	protected $name;
-	/**
-	 * @var int
-	 */
-	protected $mode;
-	/**
-	 * @var string
-	 */
-	protected $hash;
+    public function __construct(string $name, int $mode, string $hash)
+    {
+        $this->name = $name;
+        $this->mode = $mode;
+        $this->hash = $hash;
+    }
 
-	/**
-	 * TreeBranch constructor.
-	 *
-	 * @param string $name
-	 * @param int $mode
-	 * @param string $hash
-	 */
-	public function __construct(string $name, int $mode, string $hash){
-		$this->name = $name;
-		$this->mode = $mode;
-		$this->hash = $hash;
-	}
+    public function getName(): string
+    {
+        return $this->name;
+    }
 
-	/**
-	 * @return string
-	 */
-	public function getName(): string{
-		return $this->name;
-	}
+    public function getMode(): int
+    {
+        return $this->mode;
+    }
 
-	/**
-	 * @return int
-	 */
-	public function getMode(): int{
-		return $this->mode;
-	}
-
-	/**
-	 * @return string
-	 */
-	public function getHash(): string{
-		return $this->hash;
-	}
+    public function getHash(): string
+    {
+        return $this->hash;
+    }
 }
