@@ -1,15 +1,19 @@
 <?php
 
-namespace Rodziu\Git\Types;
+namespace Rodziu\Git\Objects;
 
+use Rodziu\Git\Exception\GitException;
 use Rodziu\Git\GitRepository;
 
+/**
+ * @template-implements \IteratorAggregate<int, TreeBranch>
+ */
 class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
 {
     /**
      * @var TreeBranch[]
      */
-    private $values;
+    private array $values;
 
     public function __construct(TreeBranch ...$branches)
     {
@@ -18,12 +22,20 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
 
     public static function fromGitObject(GitObject $gitObject): self
     {
+        if ($gitObject->getType() !== GitObject::TYPE_TREE) {
+            throw new GitException(
+                "Expected GitObject of type `tree`, `{$gitObject->getTypeName()}` given"
+            );
+        }
+
         $tree = new self();
         $pointer = 0;
         $stack = $mode = '';
         $data = $gitObject->getData();
+
         while (isset($data[$pointer])) {
             $char = $data[$pointer];
+
             if ($char === ' ') {
                 $mode = str_pad($stack, 6, '0', STR_PAD_LEFT);
                 $stack = '';
@@ -38,14 +50,15 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
             } else {
                 $stack .= $char;
             }
+
             $pointer++;
         }
+
         return $tree;
     }
 
     public function walkRecursive(GitRepository $gitRepository, string $parentPath = DIRECTORY_SEPARATOR): \Generator
     {
-        /** @var TreeBranch $branch */
         foreach ($this as $branch) {
             $object = $gitRepository->getObject($branch->getHash());
             yield [$parentPath, $branch, $object];

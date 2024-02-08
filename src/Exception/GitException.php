@@ -1,6 +1,6 @@
 <?php
 
-namespace Rodziu\Git;
+namespace Rodziu\Git\Exception;
 
 class GitException extends \RunTimeException
 {

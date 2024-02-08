@@ -9,4 +9,3 @@ services:
       - ./:/var/www/php-git
     working_dir: /var/www/php-git
     user: "1000:1000"
-

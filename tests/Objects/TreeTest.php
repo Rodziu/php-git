@@ -1,6 +1,6 @@
 <?php
 
-namespace Rodziu\Git\Types;
+namespace Rodziu\Git\Objects;
 
 use PHPUnit\Framework\TestCase;
 use Rodziu\Git\GitRepository;
@@ -8,10 +8,7 @@ use Rodziu\Git\TestsHelper;
 
 class TreeTest extends TestCase
 {
-    /**
-     * @var GitObject
-     */
-    private $gitObject;
+    private GitObject $gitObject;
 
     public function setUp(): void
     {

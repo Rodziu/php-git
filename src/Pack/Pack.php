@@ -2,68 +2,34 @@
 
 namespace Rodziu\Git\Pack;
 
-use Rodziu\Git\GitException;
-use Rodziu\Git\Types\GitObject;
+use Rodziu\Git\Exception\GitException;
+use Rodziu\Git\Objects\GitObject;
 
+/**
+ * @implements \IteratorAggregate<int, GitObject>
+ */
 class Pack implements \IteratorAggregate
 {
-    /**
-     * @var string
-     */
-    protected $packFilePath;
-    /**
-     * @var array
-     */
-    protected $packHeader = [];
+    protected ?PackIndex $packIndex = null;
     /**
      * @var null|resource
      */
     protected $packFileHandle = null;
-    /**
-     * @var null|PackIndex
-     */
-    protected $packIndex = null;
+    protected array $packHeader = [];
 
-    public function __construct(string $packFilePath)
-    {
+    public function __construct(
+        protected string $packFilePath
+    ) {
         if (!file_exists($packFilePath)) {
             throw new GitException("`$packFilePath` does not exist!");
         }
-        $this->packFilePath = $packFilePath;
+
         $indexPath = preg_replace('#\.pack$#', ".idx", $packFilePath);
+
         try {
             $this->packIndex = new PackIndex($indexPath);
-        } catch (GitException $e) {
+        } catch (GitException) {
         }
-    }
-
-    public function __destruct()
-    {
-        if ($this->packFileHandle !== null) {
-            $this->close();
-        }
-    }
-
-    protected function close()
-    {
-        @fclose($this->packFileHandle);
-        $this->packFileHandle = null;
-    }
-
-    public function getIterator(): \Generator
-    {
-        $header = $this->open();
-        fseek($this->packFileHandle, 12);
-        $index = [];
-        $cnt = 0;
-        $objectOffset = ftell($this->packFileHandle);
-        do {
-            $object = $this->unpackObject($objectOffset, $index);
-            yield $object;
-            $index[$object->getSha1()] = $objectOffset;
-            $objectOffset = ftell($this->packFileHandle);
-            ++$cnt;
-        } while ($cnt < $header['objectCount']);
     }
 
     public function getChecksum(): string
@@ -76,27 +42,43 @@ class Pack implements \IteratorAggregate
     /**
      * Open a pack file and read its header
      */
-    protected function open(): array
+    protected function open(): void
     {
-        if ($this->packFileHandle === null) {
-            $this->packFileHandle = fopen($this->packFilePath, 'rb');
-            /* check magic and version */
-            $magic = fread($this->packFileHandle, 4);
-            $version = unpack('Nx', fread($this->packFileHandle, 4))['x'];
-            $objectCount = unpack('Nx', fread($this->packFileHandle, 4))['x'];
-            if ($magic != 'PACK' || $version != 2) {
-                var_dump($magic, $version);
-                throw new GitException('unsupported pack format');
-            }
-            $this->packHeader = [
-                'magic' => $magic,
-                'version' => $version,
-                'objectCount' => $objectCount
-            ];
-        } else {
-            fseek($this->packFileHandle, 12);
+        if ($this->packFileHandle !== null) {
+            return;
         }
-        return $this->packHeader;
+
+        $this->packFileHandle = fopen($this->packFilePath, 'rb');
+        $magic = fread($this->packFileHandle, 4);
+        $version = unpack('Nx', fread($this->packFileHandle, 4))['x'];
+        $objectCount = unpack('Nx', fread($this->packFileHandle, 4))['x'];
+
+        if ($magic !== 'PACK' || $version !== 2) {
+            throw new GitException('unsupported pack format');
+        }
+
+        $this->packHeader = [
+            'magic' => $magic,
+            'version' => $version,
+            'objectCount' => $objectCount
+        ];
+    }
+
+    public function getIterator(): \Generator
+    {
+        $this->open();
+        fseek($this->packFileHandle, 12);
+        $index = [];
+        $cnt = 0;
+        $objectOffset = ftell($this->packFileHandle);
+
+        do {
+            $object = $this->unpackObject($objectOffset, $index);
+            yield $object;
+            $index[$object->getSha1()] = $objectOffset;
+            $objectOffset = ftell($this->packFileHandle);
+            ++$cnt;
+        } while ($cnt < $this->packHeader['objectCount']);
     }
 
     public function unpackObject(
@@ -117,8 +99,8 @@ class Pack implements \IteratorAggregate
         }
         $size = bindec($size);
         $refObject = null;
-        //
-        if ($type === 6) { // ofs delta
+
+        if ($type === GitObject::TYPE_OFS_DELTA) {
             $deltaOffset = -1;
             do {
                 $deltaOffset++;
@@ -126,12 +108,11 @@ class Pack implements \IteratorAggregate
                 $deltaOffset = ($deltaOffset << 7) + ($c & 0x7F);
             } while ($c & 0x80);
             $baseOffset = $offset - $deltaOffset;
-            //
             $dataOffset = ftell($this->packFileHandle);
             $refObject = $this->unpackObject($baseOffset);
             // set internal file pointer back to last position
             fseek($this->packFileHandle, $dataOffset);
-        } else if ($type === 7) { // ref delta
+        } else if ($type === GitObject::TYPE_REF_DELTA) {
             $dd = fread($this->packFileHandle, 20);
             $refSHA = unpack('H*', $dd)[1];
             $dataOffset = ftell($this->packFileHandle);
@@ -143,6 +124,7 @@ class Pack implements \IteratorAggregate
             // set internal file pointer back to last position
             fseek($this->packFileHandle, $dataOffset);
         }
+
         // decode object contents
         $gz = inflate_init(ZLIB_ENCODING_DEFLATE);
         $data = '';
@@ -153,39 +135,35 @@ class Pack implements \IteratorAggregate
                 break;
             }
         } while ($decoded !== false);
-        //
-        if ($type === 6 || $type === 7) { // apply delta
-            $object = new GitObject(
+
+        if ($refObject) {
+            return new GitObject(
                 $refObject->getType(),
                 $this->applyDelta($data, $refObject->getData())
             );
-        } else {
-            $object = new GitObject($type, $data, $size);
         }
-        return $object;
+
+        return new GitObject($type, $data, $size);
     }
 
-    /**
-     * @param string $hash
-     *
-     * @return null|GitObject
-     */
     public function getPackedObject(string $hash): ?GitObject
     {
         if ($this->packIndex !== null) {
             $offset = $this->packIndex->findObjectOffset($hash);
+
             if ($offset === null) {
                 return null;
             }
+
             return $this->unpackObject($offset);
-        } else {
-            /** @var GitObject $gitObject */
-            foreach ($this as $gitObject) {
-                if ($gitObject->getSha1() === $hash) {
-                    return $gitObject;
-                }
+        }
+
+        foreach ($this as $gitObject) {
+            if ($gitObject->getSha1() === $hash) {
+                return $gitObject;
             }
         }
+
         return null;
     }
 
@@ -196,27 +174,29 @@ class Pack implements \IteratorAggregate
     {
         $pos = 0;
         $getCode = function () use (&$pos, $delta) {
-            return ord($delta{$pos++});
+            return ord($delta[$pos++]);
         };
         $getBin = function ($number) {
             return str_pad(decbin($number), 8, '0', STR_PAD_LEFT);
         };
-
         $gitVarInt = function ($str, &$pos = 0) {
             $r = 0;
             $c = 0x80;
             for ($i = 0; $c & 0x80; $i += 7) {
-                $c = ord($str{$pos++});
+                $c = ord($str[$pos++]);
                 $r |= (($c & 0x7F) << $i);
             }
             return $r;
         };
+
         $gitVarInt($delta, $pos); // base size
         $gitVarInt($delta, $pos); // result size
         $result = '';
+
         while (isset($delta[$pos])) {
             $opCode = $getCode();
             $opCodeBin = $getBin($opCode);
+
             if ($opCodeBin[0]) {
                 // copy
                 $offset = $length = '';
@@ -240,5 +220,18 @@ class Pack implements \IteratorAggregate
             }
         }
         return $result;
+    }
+
+    public function __destruct()
+    {
+        if ($this->packFileHandle !== null) {
+            $this->close();
+        }
+    }
+
+    protected function close(): void
+    {
+        @fclose($this->packFileHandle);
+        $this->packFileHandle = null;
     }
 }

@@ -4,7 +4,7 @@ namespace Rodziu\Git\Pack;
 
 use PHPUnit\Framework\TestCase;
 use Rodziu\Git\TestsHelper;
-use Rodziu\Git\Types\GitObject;
+use Rodziu\Git\Objects\GitObject;
 
 class PackTest extends TestCase
 {
@@ -253,16 +253,16 @@ class PackTest extends TestCase
     public function testUnpackObject(): void
     {
         $object = (new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack'))->unpackObject(12);
-        self::assertSame('0bc4b1afe343e54015ba3b324c8208c88697876c', $object->getSha1());
         self::assertSame(254, $object->getSize());
         self::assertSame('commit', $object->getTypeName());
+        self::assertSame('0bc4b1afe343e54015ba3b324c8208c88697876c', $object->getSha1());
     }
 
     public function testGetPackedObject(): void
     {
         $pack = new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack');
         $object = $pack->getPackedObject('da91da46c59db6fb346635270f59d84aa6917d90');
-        self::assertSame('da91da46c59db6fb346635270f59d84aa6917d90', $object->getSha1());
         self::assertSame('blob', $object->getTypeName());
+        self::assertSame('da91da46c59db6fb346635270f59d84aa6917d90', $object->getSha1());
     }
 }
