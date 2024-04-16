@@ -1,13 +1,15 @@
 <?php
 
-namespace Rodziu\Git\Objects;
+declare(strict_types=1);
+
+namespace Rodziu\Git\Object;
 
 readonly class TreeBranch
 {
     public function __construct(
-        protected string $name,
-        protected int $mode,
-        protected string $hash
+        private string $name,
+        private int $mode,
+        private string $hash
     ) {
     }
 

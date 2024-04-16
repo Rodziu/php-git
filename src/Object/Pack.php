@@ -1,24 +1,28 @@
 <?php
 
-namespace Rodziu\Git\Pack;
+declare(strict_types=1);
+
+namespace Rodziu\Git\Object;
 
 use Rodziu\Git\Exception\GitException;
-use Rodziu\Git\Objects\GitObject;
 
 /**
  * @implements \IteratorAggregate<int, GitObject>
  */
 class Pack implements \IteratorAggregate
 {
-    protected ?PackIndex $packIndex = null;
+    private readonly ?PackIndex $packIndex;
     /**
      * @var null|resource
      */
-    protected $packFileHandle = null;
-    protected array $packHeader = [];
+    private $packFileHandle = null;
+    /**
+     * @var array{magic?: string, version?: int, objectCount?: int}
+     */
+    private array $packHeader = [];
 
     public function __construct(
-        protected string $packFilePath
+        private readonly string $packFilePath
     ) {
         if (!file_exists($packFilePath)) {
             throw new GitException("`$packFilePath` does not exist!");
@@ -29,6 +33,7 @@ class Pack implements \IteratorAggregate
         try {
             $this->packIndex = new PackIndex($indexPath);
         } catch (GitException) {
+            $this->packIndex = null;
         }
     }
 
@@ -42,7 +47,7 @@ class Pack implements \IteratorAggregate
     /**
      * Open a pack file and read its header
      */
-    protected function open(): void
+    private function open(): void
     {
         if ($this->packFileHandle !== null) {
             return;
@@ -67,20 +72,28 @@ class Pack implements \IteratorAggregate
     public function getIterator(): \Generator
     {
         $this->open();
-        fseek($this->packFileHandle, 12);
-        $index = [];
-        $cnt = 0;
-        $objectOffset = ftell($this->packFileHandle);
 
-        do {
-            $object = $this->unpackObject($objectOffset, $index);
-            yield $object;
-            $index[$object->getSha1()] = $objectOffset;
+        try {
+            fseek($this->packFileHandle, 12);
+            $index = [];
+            $cnt = 0;
             $objectOffset = ftell($this->packFileHandle);
-            ++$cnt;
-        } while ($cnt < $this->packHeader['objectCount']);
+
+            do {
+                $object = $this->unpackObject($objectOffset, $index);
+                yield $object;
+                $index[$object->getHash()] = $objectOffset;
+                $objectOffset = ftell($this->packFileHandle);
+                ++$cnt;
+            } while ($cnt < $this->packHeader['objectCount']);
+        } finally {
+            $this->close();
+        }
     }
 
+    /**
+     * @param array<string, int>|null $runtimeIndex
+     */
     public function unpackObject(
         int $offset,
         array $runtimeIndex = null
@@ -112,7 +125,7 @@ class Pack implements \IteratorAggregate
             $refObject = $this->unpackObject($baseOffset);
             // set internal file pointer back to last position
             fseek($this->packFileHandle, $dataOffset);
-        } else if ($type === GitObject::TYPE_REF_DELTA) {
+        } elseif ($type === GitObject::TYPE_REF_DELTA) {
             $dd = fread($this->packFileHandle, 20);
             $refSHA = unpack('H*', $dd)[1];
             $dataOffset = ftell($this->packFileHandle);
@@ -126,29 +139,27 @@ class Pack implements \IteratorAggregate
         }
 
         // decode object contents
-        $gz = inflate_init(ZLIB_ENCODING_DEFLATE);
+        $inflateContext = inflate_init(ZLIB_ENCODING_DEFLATE);
         $data = '';
+
         do {
-            $data .= $decoded = @inflate_add($gz, fgetc($this->packFileHandle));
-            $status = inflate_get_status($gz);
-            if ($status == ZLIB_STREAM_END) {
-                break;
-            }
-        } while ($decoded !== false);
+            $char = fgetc($this->packFileHandle);
+            $data .= inflate_add($inflateContext, $char);
+        } while ($char !== false && inflate_get_status($inflateContext) === ZLIB_OK);
 
         if ($refObject) {
             return new GitObject(
                 $refObject->getType(),
-                $this->applyDelta($data, $refObject->getData())
+                data: $this->applyDelta($data, $refObject->getData())
             );
         }
 
-        return new GitObject($type, $data, $size);
+        return new GitObject($type, $size, $data);
     }
 
     public function getPackedObject(string $hash): ?GitObject
     {
-        if ($this->packIndex !== null) {
+        if ($this->packIndex) {
             $offset = $this->packIndex->findObjectOffset($hash);
 
             if ($offset === null) {
@@ -159,7 +170,7 @@ class Pack implements \IteratorAggregate
         }
 
         foreach ($this as $gitObject) {
-            if ($gitObject->getSha1() === $hash) {
+            if ($gitObject->getHash() === $hash) {
                 return $gitObject;
             }
         }
@@ -170,7 +181,7 @@ class Pack implements \IteratorAggregate
     /**
      * Apply delta to Git object
      */
-    protected function applyDelta(string $delta, string $base): string
+    private function applyDelta(string $delta, string $base): string
     {
         $pos = 0;
         $getCode = function () use (&$pos, $delta) {
@@ -229,7 +240,7 @@ class Pack implements \IteratorAggregate
         }
     }
 
-    protected function close(): void
+    private function close(): void
     {
         @fclose($this->packFileHandle);
         $this->packFileHandle = null;

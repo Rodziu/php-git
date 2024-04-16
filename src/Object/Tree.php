@@ -1,12 +1,15 @@
 <?php
 
-namespace Rodziu\Git\Objects;
+declare(strict_types=1);
+
+namespace Rodziu\Git\Object;
 
 use Rodziu\Git\Exception\GitException;
-use Rodziu\Git\GitRepository;
+use Rodziu\Git\Manager\GitRepositoryManager;
 
 /**
- * @template-implements \IteratorAggregate<int, TreeBranch>
+ * @template-implements  \IteratorAggregate<int, TreeBranch>
+ * @template-implements  \ArrayAccess<int, TreeBranch>
  */
 class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
 {
@@ -15,12 +18,14 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
      */
     private array $values;
 
-    public function __construct(TreeBranch ...$branches)
-    {
+    public function __construct(
+        private readonly GitRepositoryManager $manager,
+        TreeBranch ...$branches
+    ) {
         $this->values = $branches;
     }
 
-    public static function fromGitObject(GitObject $gitObject): self
+    public static function fromGitObject(GitRepositoryManager $manager, GitObject $gitObject): self
     {
         if ($gitObject->getType() !== GitObject::TYPE_TREE) {
             throw new GitException(
@@ -28,7 +33,7 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
             );
         }
 
-        $tree = new self();
+        $tree = new self($manager);
         $pointer = 0;
         $stack = $mode = '';
         $data = $gitObject->getData();
@@ -39,10 +44,12 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
             if ($char === ' ') {
                 $mode = str_pad($stack, 6, '0', STR_PAD_LEFT);
                 $stack = '';
-            } else if ($char === "\0") {
+            } elseif ($char === "\0") {
                 $hash = unpack('H40', substr($data, ++$pointer, 20))[1];
                 $tree->values[] = new TreeBranch(
-                    $stack, (int) substr($mode, 3), $hash
+                    $stack,
+                    (int) substr($mode, 3),
+                    $hash
                 );
                 $pointer += 20;
                 $stack = '';
@@ -57,21 +64,27 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
         return $tree;
     }
 
-    public function walkRecursive(GitRepository $gitRepository, string $parentPath = DIRECTORY_SEPARATOR): \Generator
+    /**
+     * @return \Generator<array{string, TreeBranch, GitObject}>
+     */
+    public function walkRecursive(string $parentPath = ''): \Generator
     {
         foreach ($this as $branch) {
-            $object = $gitRepository->getObject($branch->getHash());
+            $object = $this->manager->getObjectReader()->getObject($branch->getHash());
             yield [$parentPath, $branch, $object];
 
             if ($object->getType() === GitObject::TYPE_TREE) {
-                yield from (Tree::fromGitObject($object))
+                yield from (Tree::fromGitObject($this->manager, $object))
                     ->walkRecursive(
-                        $gitRepository, $parentPath.$branch->getName().DIRECTORY_SEPARATOR
+                        $parentPath.$branch->getName().DIRECTORY_SEPARATOR
                     );
             }
         }
     }
 
+    /**
+     * @return \ArrayIterator<int, TreeBranch>
+     */
     public function getIterator(): \ArrayIterator
     {
         return new \ArrayIterator($this->values);
@@ -87,6 +100,7 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
         if (!($value instanceof TreeBranch)) {
             $type = gettype($value);
 
+            /* @phpstan-ignore-next-line */
             if ($type === 'object') {
                 $type = get_class($value);
             }

@@ -1,10 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rodziu\Git;
+
+use Rodziu\Git\Manager\GitRepositoryManager;
 
 abstract class TestsHelper
 {
-    const GIT_TEST_PATH = __DIR__.DIRECTORY_SEPARATOR.'gitTest';
+    public const GIT_TEST_PATH = __DIR__.DIRECTORY_SEPARATOR.'gitTest';
 
     public static function createZip(): void
     {
@@ -31,6 +35,11 @@ abstract class TestsHelper
                 $zip->close();
             }
         }
+    }
+
+    public static function getGitRepositoryManager(): GitRepositoryManager
+    {
+        return new GitRepositoryManager(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'.git');
     }
 }
 

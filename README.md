@@ -1,6 +1,6 @@
 # Pure PHP Git readonly client
 
-Readonly Git client implementation, that allows one to read Git repository data without native Git client installed.
+Readonly Git client implementation, that allows one to clone or read Git repository data without native Git client installed.
 
 ## Prerequisites
 
@@ -20,15 +20,16 @@ $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
 ```php
 $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
 $head = $gitRepository->getHead();
-$head->commitHash; // commit hash that current head points to
-$head->branch; // current branch, null if head is detached
+$head->getCommitHash(); // commit hash that current head points to
+$head->getBranch(); // current branch, null if head is detached
 ```
 
-### Get list of available (local) branches
+### Get list of available local or remote branches
 
 ```php
 $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
 $gitRepository->getBranches(); // returns an array of local branch names
+$gitRepository->getBranches(remote: true); // returns an array of remote branch names
 ```
 
 ### Get list of available tags
@@ -37,32 +38,29 @@ $gitRepository->getBranches(); // returns an array of local branch names
 $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
 foreach ($gitRepository->getTags() as $tag) {
     $tag; // \Rodziu\Git\Objects\Tag or \Rodziu\Git\Objects\AnnotatedTag
-    $tag->tag;
-    $tag->taggedObjectHash;
+    $tag->getName();
+    $tag->getTaggedObjectHash();
     ...
 } 
 ```
 
-### Get tip (latest commit hash) of given branch
+### Iterate git log starting from given commit-ish
 
-```php
-$gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
-$gitRepository->getTip('master');
-```
+`GitRepository->getLog(?string $commitIsh = null): \Generator`
 
-### Iterate log of given commit hash or branch
-
-`GitRepository->getLog(?string $commitHash = null, ?string $branch = null): \Generator`
-
-If both arguments are omitted, log will start from current HEAD.
+If argument is omitted, log will start from current HEAD.
 
 ```php
 $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
 foreach ($gitRepository->getLog() as $commit) {
     $commit; // \Rodziu\Git\Objects\Commit object 
-    $commit->message;
-    $commit->commitDate;
+    $commit->getMessage();
+    $commit->getCommitDate();
+    ...
 }
+
+// get origin/master branch log
+$gitRepository->getLog('origin/master');
 ```
 
 ### Get commit object by hash
@@ -73,24 +71,33 @@ $gitRepository->getCommit('commit-hash'); // \Rodziu\Git\Objects\Commit object
 ...
 ```
 
-### Read Git objects
+### git describe
+
+Give an object a human readable name based on an available ref
 
 ```php
 $gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
-$gitObject = $gitRepository->getObject('hash');
-$gitObject->getTypeName(); // commit/tree/blob/tag
-$gitObject->getSha1(); // hash
-$gitObject->getSize(); // object size
-$gitObject->getData(); // object contents
+$gitRepository->describe(); // describe current HEAD with annotated tags
+$gitRepository->describe('commit-ish', all: true); // describe given ref as in git describe --all
+$gitRepository->describe('commit-ish', tags: true); // describe given ref as in git describe --tags
 ```
 
-### Clone Git repository from remote
+### git clone
 
-Fetch repository info and all objects up to current HEAD, then checkout its working tree.
+Fetch repository info and all objects up to current HEAD, then checkout its working tree to `/destination/path/repository-name`.
 
 ```php
-\Rodziu\Git\GitClone::cloneRepository(
+\Rodziu\Git\GitRepository::cloneRepository(
     'https://your.repository.url/repository-name.git',
     '/destination/path/'
 );
+```
+
+### git checkout
+
+Checkout working tree to given branch, tag or commit
+
+```php
+$gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
+$gitRepository->checkout('commit-ish');
 ```

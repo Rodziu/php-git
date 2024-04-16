@@ -1,40 +1,45 @@
 <?php
 
-namespace Rodziu\Git;
+declare(strict_types=1);
+
+namespace Rodziu\Git\Service;
 
 use Rodziu\Git\Exception\GitException;
-use Rodziu\Git\Objects\GitObject;
-use Rodziu\Git\Objects\Tree;
-use Rodziu\Git\Objects\TreeBranch;
-use Rodziu\Git\Pack\Pack;
+use Rodziu\Git\Object\Pack;
 
 class GitClone
 {
-    protected readonly string $destination;
-    protected readonly string $gitPath;
+    private readonly string $repositoryPath;
 
-    protected function __construct(
-        protected readonly string $url,
-        string $destination
+    public function __construct(
+        private readonly string $url,
+        string $destinationPath
     ) {
-        if (preg_match('#/([^/]+).git$#', $url, $match)) {
-            $repositoryName = $match[1];
-        } else {
-            throw new GitException("Wrong url format!");
+        if (is_dir($destinationPath)) {
+            throw new GitException("`$destinationPath` already exists!");
         }
 
-        $destination = $destination.DIRECTORY_SEPARATOR.$repositoryName;
-
-        if (is_dir($destination)) {
-            throw new GitException("`$destination` already exists!");
-        }
-
-        $this->destination = $destination;
-        $this->gitPath = $destination.DIRECTORY_SEPARATOR.'.git';
-        mkdir($this->gitPath, 0755, true);
+        $this->repositoryPath = $destinationPath.DIRECTORY_SEPARATOR.'.git';
     }
 
-    protected function getRepositoryInfo(): array
+    public function getRepositoryPath(): string
+    {
+        return $this->repositoryPath;
+    }
+
+    public static function getRepositoryNameFromUrl(string $url): ?string
+    {
+        if (preg_match('#/([^/]+).git$#', $url, $match)) {
+            return $match[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function fetchRepositoryInfo(): array
     {
         $response = $this->uploadPackRequest("{$this->url}/info/refs?service=git-upload-pack");
 
@@ -46,9 +51,13 @@ class GitClone
 
         $repositoryInfo = $this->parseRepositoryInfo($response['data']);
 
+        if (!is_dir($this->repositoryPath)) {
+            mkdir($this->repositoryPath, 0755, true);
+        }
+
         foreach ($repositoryInfo as $filePath => $content) {
             $filePath = str_replace('/', DIRECTORY_SEPARATOR, $filePath);
-            $fullPath = $this->gitPath.DIRECTORY_SEPARATOR.$filePath;
+            $fullPath = $this->repositoryPath.DIRECTORY_SEPARATOR.$filePath;
             $dir = dirname($fullPath);
 
             if (!is_dir($dir)) {
@@ -61,7 +70,10 @@ class GitClone
         return $repositoryInfo;
     }
 
-    protected function uploadPackRequest(string $url, ?string $postData = null): array
+    /**
+     * @return array{data: string, info: mixed}
+     */
+    private function uploadPackRequest(string $url, ?string $postData = null): array
     {
         $handle = curl_init($url);
         $options = [
@@ -96,6 +108,9 @@ class GitClone
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function parseRepositoryInfo(string $gitUploadPackInfoResponse): array
     {
         $responseLines = explode("\n", $gitUploadPackInfoResponse);
@@ -128,7 +143,7 @@ class GitClone
         return $refs;
     }
 
-    protected function fetchObjects(string $head): void
+    public function fetchObjects(string $head): void
     {
         $response = $this->uploadPackRequest(
             "{$this->url}/git-upload-pack",
@@ -142,11 +157,12 @@ class GitClone
         }
 
         $dir = implode(DIRECTORY_SEPARATOR, [
-            $this->gitPath, 'objects', 'pack'
+            $this->repositoryPath, 'objects', 'pack'
         ]);
         mkdir(
             $dir,
-            0755, true
+            0755,
+            true
         );
 
         $tempPackPath = $dir.DIRECTORY_SEPARATOR.'pack-hash.pack';
@@ -160,47 +176,5 @@ class GitClone
             $tempPackPath,
             $dir.DIRECTORY_SEPARATOR."pack-$hash.pack"
         );
-    }
-
-    protected function checkout(string $head): void
-    {
-        $git = new GitRepository($this->gitPath);
-        $tree = Tree::fromGitObject($git->getObject($git->getCommit($head)->tree));
-
-        foreach ($tree->walkRecursive($git) as [$path, $branch, $object]) {
-            /**
-             * @var string $path
-             * @var TreeBranch $branch
-             * @var GitObject $object
-             */
-            $path = $this->destination.DIRECTORY_SEPARATOR.$path.$branch->getName();
-
-            if ($branch->getMode() === 0) {
-                mkdir($path, 0755);
-            } else {
-                file_put_contents($path, $object->getData());
-                if ($branch->getMode() === 755) {
-                    chmod($path, 0755);
-                }
-            }
-        }
-    }
-
-    public static function cloneRepository(string $url, string $destination): void
-    {
-        $umask = umask(0);
-
-        try {
-            $clone = new self($url, $destination);
-            $repositoryInfo = $clone->getRepositoryInfo();
-            $headRef = str_replace('ref: ', '', $repositoryInfo['HEAD']);
-            $head = $repositoryInfo[$headRef];
-            $clone->fetchObjects($head);
-            $clone->checkout($head);
-            umask($umask);
-        } catch (GitException $e) {
-            umask($umask);
-            throw $e;
-        }
     }
 }

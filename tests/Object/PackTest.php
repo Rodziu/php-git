@@ -1,21 +1,30 @@
 <?php
 
-namespace Rodziu\Git\Pack;
+declare(strict_types=1);
+
+namespace Object;
 
 use PHPUnit\Framework\TestCase;
+use Rodziu\Git\Object\GitObject;
+use Rodziu\Git\Object\Pack;
 use Rodziu\Git\TestsHelper;
-use Rodziu\Git\Objects\GitObject;
 
 class PackTest extends TestCase
 {
     public function testGetIterator(): void
     {
+        // Given
+        $pack = new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack');
+
+        // When
         $ret = [];
         /** @var GitObject $gitObject */
-        foreach (new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack') as $gitObject) {
-            $ret[] = [$gitObject->getSha1(), $gitObject->getTypeName()];
+        foreach ($pack as $gitObject) {
+            $ret[] = [$gitObject->getHash(), $gitObject->getTypeName()];
         }
-        self::assertSame([
+
+        // Then
+        $expected = [
             ['0bc4b1afe343e54015ba3b324c8208c88697876c', 'commit'],
             ['77c178155275fe2bb13be18dda3be54a200ca7c3', 'commit'],
             ['fc37310604b012792492f208e30aa3cfa5b9a98a', 'commit'],
@@ -247,22 +256,35 @@ class PackTest extends TestCase
             ['88618aa7e1076a4bec0de1a9228e3c08eadd3b68', 'blob'],
             ['75215fe42b54cd3ca51949a5a253f31a3bc2ee6e', 'blob'],
             ['a03b6739bef51409d76aa60c0c026e9a7c2e8a84', 'blob']
-        ], $ret);
+        ];
+
+        self::assertSame($expected, $ret);
     }
 
     public function testUnpackObject(): void
     {
-        $object = (new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack'))->unpackObject(12);
+        // Given
+        $pack = new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack');
+
+        // When
+        $object = $pack->unpackObject(12);
+
+        // Then
         self::assertSame(254, $object->getSize());
         self::assertSame('commit', $object->getTypeName());
-        self::assertSame('0bc4b1afe343e54015ba3b324c8208c88697876c', $object->getSha1());
+        self::assertSame('0bc4b1afe343e54015ba3b324c8208c88697876c', $object->getHash());
     }
 
     public function testGetPackedObject(): void
     {
+        // Given
         $pack = new Pack(TestsHelper::GIT_TEST_PATH.DIRECTORY_SEPARATOR.'pack.pack');
+
+        // When
         $object = $pack->getPackedObject('da91da46c59db6fb346635270f59d84aa6917d90');
+
+        // Then
         self::assertSame('blob', $object->getTypeName());
-        self::assertSame('da91da46c59db6fb346635270f59d84aa6917d90', $object->getSha1());
+        self::assertSame('da91da46c59db6fb346635270f59d84aa6917d90', $object->getHash());
     }
 }

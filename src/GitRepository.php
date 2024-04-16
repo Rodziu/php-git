@@ -1,113 +1,113 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rodziu\Git;
 
 use Rodziu\Git\Exception\GitException;
-use Rodziu\Git\Objects\AnnotatedTag;
-use Rodziu\Git\Objects\Commit;
-use Rodziu\Git\Objects\GitObject;
-use Rodziu\Git\Objects\HEAD;
-use Rodziu\Git\Objects\Tag;
-use Rodziu\Git\Pack\Pack;
+use Rodziu\Git\Manager\GitRepositoryManager;
+use Rodziu\Git\Object\AnnotatedTag;
+use Rodziu\Git\Object\Commit;
+use Rodziu\Git\Object\GitObject;
+use Rodziu\Git\Object\Head;
+use Rodziu\Git\Object\Tag;
+use Rodziu\Git\Object\Tree;
+use Rodziu\Git\Object\TreeBranch;
+use Rodziu\Git\Service\GitClone;
 
-class GitRepository
+readonly class GitRepository
 {
-    /**
-     * @var Pack[]
-     */
-    private ?array $packs = null;
+    private GitRepositoryManager $manager;
 
-    /**
-     * GitRepository constructor.
-     *
-     * @param string $gitRepoPath
-     */
-    public function __construct(
-        private string $gitRepoPath
-    ) {
-        $gitRepoPath = rtrim($gitRepoPath, DIRECTORY_SEPARATOR);
-
-        if (basename($gitRepoPath) != '.git' || !file_exists($gitRepoPath)) {
-            throw new GitException("$gitRepoPath is not a git repository!");
-        }
-
-        $this->gitRepoPath = $gitRepoPath;
+    public function __construct(string $repositoryPath)
+    {
+        $this->manager = new GitRepositoryManager($repositoryPath);
     }
 
-    /**
-     * Get current HEAD of repository
-     *
-     * @throws GitException
-     */
-    public function getHead(): HEAD
+    public static function cloneRepository(
+        string $url,
+        string $destinationPath,
+        bool $parseRepositoryName = true,
+        bool $checkout = true
+    ): self {
+        if ($parseRepositoryName) {
+            $repositoryName = GitClone::getRepositoryNameFromUrl($url);
+
+            if ($repositoryName === null) {
+                throw new GitException("Could not parse repository name from `$url`");
+            }
+
+            $destinationPath = $destinationPath.DIRECTORY_SEPARATOR.$repositoryName;
+        }
+
+
+        $umask = umask(0);
+
+        try {
+            $clone = new GitClone($url, $destinationPath);
+            $clone->fetchRepositoryInfo();
+            $git = new self($clone->getRepositoryPath());
+            $head = $git->getHead();
+            $clone->fetchObjects($head->getCommitHash());
+            if ($checkout) {
+                $git->checkout($head->getCommitHash());
+            }
+            umask($umask);
+            return $git;
+        } catch (GitException $e) {
+            umask($umask);
+            throw $e;
+        }
+    }
+
+    public function getHead(): Head
     {
-        $headPath = $this->gitRepoPath.DIRECTORY_SEPARATOR.'HEAD';
+        return $this->manager->getRefReader()
+            ->getHead();
+    }
 
-        if (!file_exists($headPath)) {
-            throw new GitException("Head file does not exist at $headPath!");
+    public function checkout(string $commitIsh = null): void
+    {
+        $commitHash = $this->manager->getRefReader()
+            ->resolveCommitIsh($commitIsh);
+        $commit = $this->getCommit($commitHash);
+        $treeObject = $this->manager->getObjectReader()
+            ->getObject($commit->getTree());
+        $tree = Tree::fromGitObject($this->manager, $treeObject);
+        $basePath = dirname($this->manager->getRepositoryPath());
+
+        foreach ($tree->walkRecursive() as [$path, $branch, $object]) {
+            /**
+             * @var string $path
+             * @var TreeBranch $branch
+             * @var GitObject $object
+             */
+            $path = $basePath.DIRECTORY_SEPARATOR.$path.$branch->getName();
+
+            if ($branch->getMode() === 0) {
+                mkdir($path, 0755);
+            } else {
+                file_put_contents($path, $object->getData());
+                if ($branch->getMode() === 755) {
+                    chmod($path, 0755);
+                }
+            }
         }
-
-        $head = trim(file_get_contents($headPath));
-
-        if (strlen($head) == 40) {
-            return new HEAD($head);
-        } else if (!preg_match('#^ref:\s+(.*)$#su', $head, $match)) {
-            throw new GitException("Could not match ref: in $headPath!");
-        }
-
-        $branch = preg_replace('#^.*/#', '', $match[1]);
-
-        return new HEAD(
-            trim(file_get_contents(
-                $this->gitRepoPath.DIRECTORY_SEPARATOR.trim($match[1])
-            )),
-            $branch
-        );
     }
 
     /**
      * @return string[]
      */
-    public function getBranches(): array
+    public function getBranches(bool $remote = false): array
     {
-        $ret = [];
-        $packedRefs = $this->getPackedRefs();
+        $refReader = $this->manager->getRefReader();
+        $branches = [];
 
-        foreach ($packedRefs['heads'] as $v) {
-            $ret[] = $v;
+        foreach ($refReader->getRefs($remote ? 'remotes' : 'heads') as $ref) {
+            $branches[] = $ref->getName();
         }
 
-        $iterator = new \IteratorIterator(new \DirectoryIterator(
-            $this->gitRepoPath.DIRECTORY_SEPARATOR.'refs'.DIRECTORY_SEPARATOR.'heads'
-        ));
-        foreach ($iterator as $i) {
-            if (!$i->isDot()) {
-                $ret[] = $i->getFileName();
-            }
-        }
-
-        return $ret;
-    }
-
-    protected function getPackedRefs(): array
-    {
-        $ret = [
-            'heads' => [],
-            'tags' => []
-        ];
-        $packedRefsPath = $this->gitRepoPath.DIRECTORY_SEPARATOR.'packed-refs';
-
-        if (file_exists($packedRefsPath)) {
-            $packedRefs = file_get_contents($packedRefsPath);
-
-            if (preg_match_all('#^([a-z0-9]{40}) refs/(tags|heads)/(.*)$#m', $packedRefs, $matches, PREG_SET_ORDER)) {
-                foreach ($matches as $m) {
-                    $ret[$m[2]][$m[3]] = $m[1];
-                }
-            }
-        }
-
-        return $ret;
+        return $branches;
     }
 
     /**
@@ -115,125 +115,31 @@ class GitRepository
      */
     public function getTags(): array
     {
+        $refReader = $this->manager->getRefReader();
+        $objectReader = $this->manager->getObjectReader();
         $tags = [];
-        $packedRefs = $this->getPackedRefs();
 
-        foreach ($packedRefs['tags'] as $tagName => $taggedObjectHash) {
-            $tags[] = $this->getTagObject($tagName, $taggedObjectHash);
-        }
-
-        $iterator = new \IteratorIterator(new \DirectoryIterator(
-            $this->gitRepoPath.DIRECTORY_SEPARATOR.'refs'.DIRECTORY_SEPARATOR.'tags'
-        ));
-        foreach ($iterator as $i) {
-            /** @var $i \DirectoryIterator */
-            if (!$i->isDot()) {
-                $tags[] = $this->getTagObject(
-                    $i->getFilename(),
-                    trim(file_get_contents($i->getPathname()))
+        foreach ($refReader->getRefs('tags') as $ref) {
+            if ($ref->getAnnotatedTagTargetHash() !== null) {
+                $tags[] = AnnotatedTag::fromGitObject(
+                    $objectReader->getObject($ref->getTargetObjectHash())
                 );
+            } else {
+                $tags[] = new Tag($ref->getName(), $ref->getTargetObjectHash());
             }
         }
 
         usort($tags, function (Tag $a, Tag $b) {
-            return version_compare($b->tag, $a->tag);
+            return version_compare($b->getName(), $a->getName());
         });
 
         return $tags;
     }
 
-    private function getTagObject(string $tagName, string $taggedObjectHash): Tag|AnnotatedTag
-    {
-        $taggedObject = $this->getObject($taggedObjectHash);
-
-        if ($taggedObject->getType() !== GitObject::TYPE_TAG) {
-            return new Tag($tagName, $taggedObjectHash);
-        }
-
-        return AnnotatedTag::fromGitObject($taggedObject);
-    }
-
-    public function getObject(string $hash): ?GitObject
-    {
-        $localPath = $this->gitRepoPath
-            .DIRECTORY_SEPARATOR.'objects'
-            .DIRECTORY_SEPARATOR.substr($hash, 0, 2)
-            .DIRECTORY_SEPARATOR.substr($hash, 2);
-        $object = GitObject::createFromFile($localPath);
-
-        if ($object !== null) {
-            return $object;
-        }
-
-        foreach ($this->getPacks() as $pack) {
-            $object = $pack->getPackedObject($hash);
-
-            if ($object !== null) {
-                return $object;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @return \Generator<Commit>
-     */
-    public function getLog(
-        ?string $commitHash = null,
-        string $branch = null
-    ): \Generator {
-        if ($commitHash === null && $branch === null) {
-            $commitHash = $this->getHead()->commitHash;
-        } else if ($commitHash === null) {
-            $commitHash = $this->getTip($branch);
-        }
-
-        $candidates = [$this->getCommit($commitHash)];
-        $visitedHashes = [$commitHash];
-
-        do {
-            usort($candidates, function (Commit $a, Commit $b) {
-                return $b->authorDate->getTimestamp() <=> $a->authorDate->getTimestamp();
-            });
-
-            $currentCommit = array_shift($candidates);
-            yield $currentCommit;
-
-            foreach ($currentCommit->parents as $parentCommitHash) {
-                if (in_array($parentCommitHash, $visitedHashes)) {
-                    continue;
-                }
-
-                $candidates[] = $this->getCommit($parentCommitHash);
-                $visitedHashes[] = $parentCommitHash;
-            }
-        } while (count($candidates) > 0);
-    }
-
-    /**
-     * @throws GitException
-     */
-    public function getTip(string $branch = 'master'): string
-    {
-        $headPath = $this->gitRepoPath
-            .DIRECTORY_SEPARATOR.'refs'
-            .DIRECTORY_SEPARATOR.'heads'
-            .DIRECTORY_SEPARATOR.$branch;
-
-        if (!file_exists($headPath)) {
-            throw new GitException("No such branch $branch!");
-        }
-
-        return trim(file_get_contents($headPath));
-    }
-
-    /**
-     * @throws GitException
-     */
     public function getCommit(string $commitHash): Commit
     {
-        $object = $this->getObject($commitHash);
+        $object = $this->manager->getObjectReader()
+            ->getObject($commitHash);
 
         if ($object === null || $object->getType() !== GitObject::TYPE_COMMIT) {
             throw new GitException("Commit $commitHash does not exist!");
@@ -243,45 +149,22 @@ class GitRepository
     }
 
     /**
-     * @return Pack[]
+     * @return \Generator<Commit>
      */
-    protected function getPacks(): array
+    public function getLog(?string $commitIsh = null): \Generator
     {
-        if ($this->packs !== null) {
-            return $this->packs;
-        }
+        $gitLog = $this->manager->getGitLog();
 
-        $this->packs = [];
-        $packsDirectory = $this->gitRepoPath.DIRECTORY_SEPARATOR.'objects'.DIRECTORY_SEPARATOR.'pack';
-
-        if (is_dir($packsDirectory)) {
-            foreach (new \DirectoryIterator($packsDirectory) as $pack) {
-                if ($pack->isFile() && $pack->getExtension() === 'pack') {
-                    $this->packs[] = new Pack($pack->getPathname());
-                }
-            }
-        }
-
-        return $this->packs;
+        yield from $gitLog($commitIsh);
     }
 
-    /**
-     * Save git object to filesystem if it doesn't already exist
-     */
-    public function saveGitObject(GitObject $gitObject): void
-    {
-        $path = $this->gitRepoPath.DIRECTORY_SEPARATOR.'objects'.DIRECTORY_SEPARATOR
-            .substr($gitObject->getSha1(), 0, 2);
-        $objectFile = substr($gitObject->getSha1(), 2);
+    public function describe(
+        ?string $commitIsh = null,
+        bool $all = false,
+        bool $tags = false
+    ): string {
+        $gitDescribe = $this->manager->getGitDescribe();
 
-        if (file_exists($path.DIRECTORY_SEPARATOR.$objectFile)) {
-            return;
-        }
-
-        @mkdir($path);
-        file_put_contents(
-            $path.DIRECTORY_SEPARATOR.$objectFile,
-            gzcompress((string) $gitObject)
-        );
+        return $gitDescribe($commitIsh, $all, $tags);
     }
 }

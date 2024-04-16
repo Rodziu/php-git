@@ -1,11 +1,9 @@
-version: '3.8'
 services:
   php:
     build:
-      context: ./docker/php
-    stdin_open: true
-    tty: true
+      context: .
+    working_dir: /var/www/php-git
     volumes:
       - ./:/var/www/php-git
-    working_dir: /var/www/php-git
-    user: "1000:1000"
+    stdin_open: true
+    tty: true

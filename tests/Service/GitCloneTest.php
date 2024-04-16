@@ -1,22 +1,27 @@
 <?php
 
-namespace Rodziu\Git;
+declare(strict_types=1);
+
+namespace Rodziu\Git\Service;
 
 use PHPUnit\Framework\TestCase;
 
 class GitCloneTest extends TestCase
 {
-    private readonly GitClone $gitClone;
+    private GitClone $gitClone;
 
     public function setUp(): void
     {
         parent::setUp();
-        $this->gitClone = new class() extends GitClone {
+        $this->gitClone = new class () extends GitClone {
             public function __construct()
             {
                 parent::__construct('https://github.com/Rodziu/php-git.git', '');
             }
 
+            /**
+             * @return array<string, string>
+             */
             public function parseRepositoryInfoProxy(string $gitUploadPackInfoResponse): array
             {
                 return $this->parseRepositoryInfo($gitUploadPackInfoResponse);
@@ -26,6 +31,7 @@ class GitCloneTest extends TestCase
 
     public function testParseRepositoryInfo(): void
     {
+        // Given
         /** @noinspection SpellCheckingInspection */
         $gitUploadPackInfoResponse = <<<EOF
 001e# service=git-upload-pack
@@ -36,8 +42,11 @@ class GitCloneTest extends TestCase
 003df65e820a9211d8076618f5dee1c8ca2d79759664 refs/tags/1.1.0
 EOF;
 
+        // When
+        /* @phpstan-ignore-next-line */
         $refs = $this->gitClone->parseRepositoryInfoProxy($gitUploadPackInfoResponse);
 
+        // Then
         $this->assertSame(
             [
                 'HEAD' => 'ref: refs/heads/master',
