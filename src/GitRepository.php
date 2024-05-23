@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Rodziu\Git;
 
-use Rodziu\Git\Exception\GitException;
 use Rodziu\Git\Manager\GitRepositoryManager;
 use Rodziu\Git\Object\AnnotatedTag;
 use Rodziu\Git\Object\Commit;
@@ -12,7 +11,6 @@ use Rodziu\Git\Object\GitObject;
 use Rodziu\Git\Object\Head;
 use Rodziu\Git\Object\Tag;
 use Rodziu\Git\Object\Tree;
-use Rodziu\Git\Object\TreeBranch;
 use Rodziu\Git\Service\GitClone;
 
 readonly class GitRepository
@@ -30,34 +28,24 @@ readonly class GitRepository
         bool $parseRepositoryName = true,
         bool $checkout = true
     ): self {
-        if ($parseRepositoryName) {
-            $repositoryName = GitClone::getRepositoryNameFromUrl($url);
+        return GitClone::cloneRepository(
+            $url,
+            $destinationPath,
+            $parseRepositoryName,
+            $checkout
+        );
+    }
 
-            if ($repositoryName === null) {
-                throw new GitException("Could not parse repository name from `$url`");
-            }
+    public function fetch(string $remote = 'origin'): void
+    {
+        $fetch = $this->manager->getGitFetch();
+        $fetch($remote);
+    }
 
-            $destinationPath = $destinationPath.DIRECTORY_SEPARATOR.$repositoryName;
-        }
-
-
-        $umask = umask(0);
-
-        try {
-            $clone = new GitClone($url, $destinationPath);
-            $clone->fetchRepositoryInfo();
-            $git = new self($clone->getRepositoryPath());
-            $head = $git->getHead();
-            $clone->fetchObjects($head->getCommitHash());
-            if ($checkout) {
-                $git->checkout($head->getCommitHash());
-            }
-            umask($umask);
-            return $git;
-        } catch (GitException $e) {
-            umask($umask);
-            throw $e;
-        }
+    public function checkout(string $commitIsh = null): void
+    {
+        $this->manager->getGitCheckout()
+            ->checkout($commitIsh);
     }
 
     public function getHead(): Head
@@ -66,33 +54,22 @@ readonly class GitRepository
             ->getHead();
     }
 
-    public function checkout(string $commitIsh = null): void
+    public function getObject(string $objectPath): ?GitObject
     {
-        $commitHash = $this->manager->getRefReader()
-            ->resolveCommitIsh($commitIsh);
-        $commit = $this->getCommit($commitHash);
-        $treeObject = $this->manager->getObjectReader()
-            ->getObject($commit->getTree());
-        $tree = Tree::fromGitObject($this->manager, $treeObject);
-        $basePath = dirname($this->manager->getRepositoryPath());
+        return $this->manager->getObjectReader()
+            ->getObject($objectPath);
+    }
 
-        foreach ($tree->walkRecursive() as [$path, $branch, $object]) {
-            /**
-             * @var string $path
-             * @var TreeBranch $branch
-             * @var GitObject $object
-             */
-            $path = $basePath.DIRECTORY_SEPARATOR.$path.$branch->getName();
+    public function getCommit(string $commitHash): Commit
+    {
+        return $this->manager->getObjectReader()
+            ->getCommit($commitHash);
+    }
 
-            if ($branch->getMode() === 0) {
-                mkdir($path, 0755);
-            } else {
-                file_put_contents($path, $object->getData());
-                if ($branch->getMode() === 755) {
-                    chmod($path, 0755);
-                }
-            }
-        }
+    public function getTree(string $treeHash): Tree
+    {
+        return $this->manager->getObjectReader()
+            ->getTree($treeHash);
     }
 
     /**
@@ -116,13 +93,12 @@ readonly class GitRepository
     public function getTags(): array
     {
         $refReader = $this->manager->getRefReader();
-        $objectReader = $this->manager->getObjectReader();
         $tags = [];
 
         foreach ($refReader->getRefs('tags') as $ref) {
             if ($ref->getAnnotatedTagTargetHash() !== null) {
                 $tags[] = AnnotatedTag::fromGitObject(
-                    $objectReader->getObject($ref->getTargetObjectHash())
+                    $this->getObject($ref->getTargetObjectHash())
                 );
             } else {
                 $tags[] = new Tag($ref->getName(), $ref->getTargetObjectHash());
@@ -134,18 +110,6 @@ readonly class GitRepository
         });
 
         return $tags;
-    }
-
-    public function getCommit(string $commitHash): Commit
-    {
-        $object = $this->manager->getObjectReader()
-            ->getObject($commitHash);
-
-        if ($object === null || $object->getType() !== GitObject::TYPE_COMMIT) {
-            throw new GitException("Commit $commitHash does not exist!");
-        }
-
-        return Commit::fromGitObject($object);
     }
 
     /**

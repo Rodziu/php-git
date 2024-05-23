@@ -3,9 +3,12 @@ declare(strict_types=1);
 
 namespace Rodziu\Git\Service;
 
+use Rodziu\Git\Exception\GitException;
 use Rodziu\Git\Manager\GitRepositoryManager;
+use Rodziu\Git\Object\Commit;
 use Rodziu\Git\Object\GitObject;
 use Rodziu\Git\Object\Pack;
+use Rodziu\Git\Object\Tree;
 
 readonly class GitObjectReader
 {
@@ -108,5 +111,27 @@ readonly class GitObjectReader
         $localPath = $this->getLocalObjectPath($hash);
 
         return $localPath ? GitObject::createFromFile($localPath) : null;
+    }
+
+    public function getCommit(string $commitHash): Commit
+    {
+        $object = $this->getObject($commitHash);
+
+        if ($object === null || $object->getType() !== GitObject::TYPE_COMMIT) {
+            throw new GitException("Commit $commitHash does not exist!");
+        }
+
+        return Commit::fromGitObject($object);
+    }
+
+    public function getTree(string $treeHash): Tree
+    {
+        $treeObject = $this->getObject($treeHash);
+
+        if ($treeObject === null || $treeObject->getType() !== GitObject::TYPE_TREE) {
+            throw new GitException("Tree $treeHash does not exist!");
+        }
+
+        return Tree::fromGitObject($this->manager, $treeObject);
     }
 }

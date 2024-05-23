@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Rodziu\Git;
 
 use Rodziu\Git\Manager\GitRepositoryManager;
+use Rodziu\Git\Util\FileSystemUtil;
 
 abstract class TestsHelper
 {
-    public const GIT_TEST_PATH = __DIR__.DIRECTORY_SEPARATOR.'gitTest';
+    public const GIT_TEST_PATH = __DIR__.DIRECTORY_SEPARATOR.'git-test';
 
     public static function createZip(): void
     {
@@ -35,6 +36,15 @@ abstract class TestsHelper
                 $zip->close();
             }
         }
+    }
+
+    public static function restoreTestRepository(): void
+    {
+        if (is_dir(self::GIT_TEST_PATH)) {
+            FileSystemUtil::rmdirRecursive(self::GIT_TEST_PATH);
+        }
+
+        self::unpackZip();
     }
 
     public static function getGitRepositoryManager(): GitRepositoryManager

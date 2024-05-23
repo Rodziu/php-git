@@ -37,6 +37,6 @@ readonly class GitRef implements \Stringable
 
     public function __toString(): string
     {
-        return $this->name;
+        return "refs/{$this->type}/{$this->name}";
     }
 }

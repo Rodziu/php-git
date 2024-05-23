@@ -23,7 +23,7 @@ readonly class GitDescribe
         bool $tags = false
     ): string {
         $describedObjectHash = $this->manager->getRefReader()
-            ->resolveCommitIsh($commitIsh, true);
+            ->resolveCommitIshToHash($commitIsh);
         $describedObjectType = $this->manager->getObjectReader()
             ->getObjectType($describedObjectHash);
 

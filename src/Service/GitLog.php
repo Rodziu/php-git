@@ -19,7 +19,7 @@ readonly class GitLog
     public function __invoke(?string $commitIsh = null): \Generator
     {
         $commitHash = $this->manager->getRefReader()
-            ->resolveCommitIsh($commitIsh);
+            ->resolveCommitIshToHash($commitIsh);
         $candidates = [$this->getCommit($commitHash)];
         $visitedHashes = [$commitHash];
 

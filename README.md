@@ -93,6 +93,15 @@ Fetch repository info and all objects up to current HEAD, then checkout its work
 );
 ```
 
+### git fetch
+
+Update repository data from remote
+
+```php
+$gitRepository = new \Rodziu\Git\GitRepository('/path/to/your/project/.git');
+$gitRepository->fetch('origin');
+```
+
 ### git checkout
 
 Checkout working tree to given branch, tag or commit

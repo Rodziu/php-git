@@ -5,57 +5,70 @@ declare(strict_types=1);
 namespace Rodziu\Git\Service;
 
 use PHPUnit\Framework\TestCase;
+use Rodziu\Git\TestsHelper;
 
 class GitCloneTest extends TestCase
 {
-    private GitClone $gitClone;
-
-    public function setUp(): void
+    protected function tearDown(): void
     {
-        parent::setUp();
-        $this->gitClone = new class () extends GitClone {
-            public function __construct()
-            {
-                parent::__construct('https://github.com/Rodziu/php-git.git', '');
-            }
+        parent::tearDown();
 
-            /**
-             * @return array<string, string>
-             */
-            public function parseRepositoryInfoProxy(string $gitUploadPackInfoResponse): array
-            {
-                return $this->parseRepositoryInfo($gitUploadPackInfoResponse);
-            }
-        };
+        TestsHelper::restoreTestRepository();
     }
 
-    public function testParseRepositoryInfo(): void
+    public function testCloneRepository(): void
     {
         // Given
-        /** @noinspection SpellCheckingInspection */
-        $gitUploadPackInfoResponse = <<<EOF
-001e# service=git-upload-pack
-00000155f65e820a9211d8076618f5dee1c8ca2d79759664 HEAD multi_ack thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative no-progress include-tag multi_ack_detailed allow-tip-sha1-in-want allow-reachable-sha1-in-want no-done symref=HEAD:refs/heads/master filter object-format=sha1 agent=git/github-f2c0399b4791
-003ff65e820a9211d8076618f5dee1c8ca2d79759664 refs/heads/master
-003d96f3e4fa5111a26a408a52bd73ff9a45d6686520 refs/tags/1.0.0
-003d69bdbc89b43de4ca173fc4dddff0ae14641d854e refs/tags/1.0.1
-003df65e820a9211d8076618f5dee1c8ca2d79759664 refs/tags/1.1.0
-EOF;
+        $manager = TestsHelper::getGitRepositoryManager();
+        $remoteConfig = $manager->getConfig()
+            ->getSectionVariables('remote', 'origin');
+        $url = $remoteConfig['url'];
 
         // When
-        /* @phpstan-ignore-next-line */
-        $refs = $this->gitClone->parseRepositoryInfoProxy($gitUploadPackInfoResponse);
+        $destination = TestsHelper::GIT_TEST_PATH;
+        GitClone::cloneRepository(
+            $url,
+            $destination,
+        );
 
         // Then
-        $this->assertSame(
-            [
-                'HEAD' => 'ref: refs/heads/master',
-                'refs/heads/master' => 'f65e820a9211d8076618f5dee1c8ca2d79759664',
-                'refs/tags/1.0.0' => '96f3e4fa5111a26a408a52bd73ff9a45d6686520',
-                'refs/tags/1.0.1' => '69bdbc89b43de4ca173fc4dddff0ae14641d854e',
-                'refs/tags/1.1.0' => 'f65e820a9211d8076618f5dee1c8ca2d79759664'
-            ],
-            $refs
-        );
+        $destination .= DIRECTORY_SEPARATOR.'git-test';
+        self::assertDirectoryExists($destination);
+
+        $dirs = [
+            'test/dir_test',
+            'test',
+            '.git/objects/pack',
+            '.git/objects',
+            '.git/refs/tags',
+            '.git/refs/remotes',
+            '.git/refs/heads',
+            '.git/refs',
+            '.git',
+        ];
+        $files = [
+            'pack.pack',
+            '.git-changelog',
+            'pack.idx',
+            'file3',
+            'fileOnBranch',
+            'secondFileOnBranch',
+            'file2',
+            'file',
+            'test/dir_test/file777',
+            'test/file_test',
+            '.git/config',
+            '.git/objects/pack/pack-60a8fe114ec270c0922f96aa7a082f611a12fca1.pack',
+            '.git/packed-refs',
+            '.git/HEAD',
+        ];
+
+        foreach ($dirs as $dir) {
+            self::assertDirectoryExists($destination.DIRECTORY_SEPARATOR.$dir);
+        }
+
+        foreach ($files as $file) {
+            self::assertFileExists($destination.DIRECTORY_SEPARATOR.$file);
+        }
     }
 }

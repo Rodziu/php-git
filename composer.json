@@ -22,7 +22,8 @@
   "require": {
     "php": ">=8.2",
     "ext-curl": "*",
-    "ext-zlib": "*"
+    "ext-zlib": "*",
+    "guzzlehttp/guzzle": "^7.8"
   },
   "require-dev": {
     "ext-zip": "*",

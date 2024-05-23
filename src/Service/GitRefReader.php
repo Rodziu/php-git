@@ -46,12 +46,13 @@ readonly class GitRefReader
     /**
      * @return \Generator<GitRef>
      */
-    public function getRefs(?string $type = null): \Generator
+    public function getRefs(?string $type = null, string ...$anotherType): \Generator
     {
         $types = ['remotes', 'heads', 'tags'];
 
         if ($type !== null) {
-            $types = [$type];
+            array_unshift($anotherType, $type);
+            $types = $anotherType;
         }
 
         $objectReader = $this->manager->getObjectReader();
@@ -85,13 +86,13 @@ readonly class GitRefReader
             }
         }
 
-        yield from $this->getPackedRefs($type);
+        yield from $this->getPackedRefs(...$types);
     }
 
     /**
      * @return \Generator<GitRef>
      */
-    private function getPackedRefs(?string $type = null): \Generator
+    private function getPackedRefs(string ...$type): \Generator
     {
         $packedRefsPath = $this->manager->resolvePath('packed-refs');
 
@@ -124,7 +125,7 @@ readonly class GitRefReader
 
                     [, $currentType, $name] = $ref;
 
-                    if ($type !== null && $currentType !== $type) {
+                    if (count($type) > 0 && !in_array($currentType, $type)) {
                         continue;
                     }
 
@@ -154,52 +155,93 @@ readonly class GitRefReader
         }
     }
 
-    public function resolveCommitIsh(?string $commitIsh = null, bool $expandHash = false): ?string
+    public function resolveCommitIshToHash(?string $commitIsh = null): string
+    {
+        $ref = $this->resolveCommitIsh($commitIsh);
+
+        if ($ref instanceof Head) {
+            return $ref->getCommitHash();
+        } elseif ($ref instanceof GitRef) {
+            return $ref->getTargetObjectHash();
+        }
+
+        return $ref;
+    }
+
+    public function resolveCommitIsh(?string $commitIsh = null): Head|GitRef|string
     {
         if ($commitIsh === null) {
-            return $this->getHead()->getCommitHash();
+            return $this->getHead();
         }
 
         if (strlen($commitIsh) === 40) {
             return $commitIsh;
         }
 
-        $refObjectHash = $this->getRefObjectHash($commitIsh);
+        $refObject = $this->getRefObject($commitIsh);
 
-        if ($refObjectHash !== null) {
-            return $refObjectHash;
+        if ($refObject !== null) {
+            return $refObject;
         }
 
-        if ($expandHash) {
-            $object = $this->manager->getObjectReader()
-                ->getObject($commitIsh);
+        $object = $this->manager->getObjectReader()
+            ->getObject($commitIsh);
 
-            if ($object === null) {
-                throw new GitException("No object matches `$commitIsh`!");
-            }
-
-            return $object->getHash();
+        if ($object === null) {
+            throw new GitException("No object matches `$commitIsh`!");
         }
 
-        return $commitIsh;
+        return $object->getHash();
     }
 
-    public function getRefObjectHash(string $referenceName): ?string
+    public function getRefObject(string $referenceName): ?GitRef
     {
-        foreach ($this->getPackedRefs() as $ref) {
+        foreach ($this->getRefs() as $ref) {
             if ($ref->getName() === $referenceName) {
-                return $ref->getTargetObjectHash();
+                return $ref;
             }
         }
 
-        $paths = glob(
-            $this->manager->resolvePath('refs', '*', $referenceName)
-        );
+        return null;
+    }
 
-        if ($paths === false || count($paths) === 0) {
-            return null;
+    /**
+     * @param GitRef[] $refs
+     */
+    public function storeRefs(array $refs): void
+    {
+        $packedRefs = [];
+
+        foreach ($this->getPackedRefs() as $ref) {
+            $packedRefs[(string) $ref] = $ref;
         }
 
-        return trim(file_get_contents($paths[0]));
+        foreach ($refs as $ref) {
+            $path = $this->manager->resolvePath('refs', $ref->getType(), $ref->getName());
+
+            if (file_exists($path)) {
+                file_put_contents($path, $ref->getTargetObjectHash());
+                continue;
+            }
+
+            $packedRefs[(string) $ref] = $ref;
+        }
+
+        ksort($packedRefs);
+
+        $packedRefs = array_map(function (GitRef $ref) {
+            $result = $ref->getTargetObjectHash().' '.$ref;
+
+            if ($ref->getAnnotatedTagTargetHash()) {
+                $result .= PHP_EOL.'^'.$ref->getAnnotatedTagTargetHash();
+            }
+
+            return $result;
+        }, $packedRefs);
+
+        $packedRefsContents = '# pack-refs with: peeled fully-peeled sorted '.PHP_EOL
+            .implode(PHP_EOL, $packedRefs).PHP_EOL;
+
+        file_put_contents($this->manager->resolvePath('packed-refs'), $packedRefsContents);
     }
 }

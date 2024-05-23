@@ -5,10 +5,14 @@ namespace Rodziu\Git\Manager;
 
 use Rodziu\Git\Exception\GitException;
 use Rodziu\Git\Object\Pack;
+use Rodziu\Git\Service\GitCheckout;
+use Rodziu\Git\Service\GitConfig;
 use Rodziu\Git\Service\GitDescribe;
+use Rodziu\Git\Service\GitFetch;
 use Rodziu\Git\Service\GitLog;
 use Rodziu\Git\Service\GitObjectReader;
 use Rodziu\Git\Service\GitRefReader;
+use Rodziu\Git\Service\GitUploadPackClient;
 
 class GitRepositoryManager
 {
@@ -27,7 +31,7 @@ class GitRepositoryManager
     ) {
         $repositoryPath = rtrim($repositoryPath, DIRECTORY_SEPARATOR);
 
-        if (basename($repositoryPath) != '.git' || !file_exists($repositoryPath)) {
+        if (basename($repositoryPath) !== '.git' || !file_exists($repositoryPath)) {
             throw new GitException("$repositoryPath is not a git repository!");
         }
 
@@ -89,5 +93,25 @@ class GitRepositoryManager
     public function getGitDescribe(): GitDescribe
     {
         return $this->getDependency(GitDescribe::class);
+    }
+
+    public function getConfig(): GitConfig
+    {
+        return $this->getDependency(GitConfig::class);
+    }
+
+    public function getUploadPackClient(): GitUploadPackClient
+    {
+        return $this->getDependency(GitUploadPackClient::class);
+    }
+
+    public function getGitFetch(): GitFetch
+    {
+        return $this->getDependency(GitFetch::class);
+    }
+
+    public function getGitCheckout(): GitCheckout
+    {
+        return $this->getDependency(GitCheckout::class);
     }
 }

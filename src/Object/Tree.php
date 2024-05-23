@@ -132,4 +132,31 @@ class Tree implements \Countable, \ArrayAccess, \IteratorAggregate
     {
         return $this->values[$offset];
     }
+
+    public function findFileByPath(string $path): ?TreeBranch
+    {
+        $path = ltrim($path, '/');
+        $path = explode('/', $path);
+        $tree = $this;
+
+        do {
+            $lookFor = array_shift($path);
+            $found = false;
+
+            foreach ($tree as $branch) {
+                if ($branch->getName() === $lookFor) {
+                    if (count($path) === 0) {
+                        return $branch;
+                    }
+
+                    $object = $this->manager->getObjectReader()->getObject($branch->getHash());
+                    $tree = Tree::fromGitObject($this->manager, $object);
+                    $found = true;
+                    break;
+                }
+            }
+        } while (count($path) > 0 && $found);
+
+        return null;
+    }
 }
