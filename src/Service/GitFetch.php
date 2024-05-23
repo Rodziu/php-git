@@ -6,6 +6,7 @@ namespace Rodziu\Git\Service;
 use Rodziu\Git\Manager\GitRepositoryManager;
 use Rodziu\Git\Object\GitRef;
 use Rodziu\Git\Object\Head;
+use Rodziu\Git\Util\FileSystemUtil;
 
 readonly class GitFetch
 {
@@ -83,6 +84,7 @@ readonly class GitFetch
     public function updateRefs(array $repositoryInfo, string $remote): void
     {
         $headPath = $this->manager->resolvePath('refs', 'remotes', $remote, 'HEAD');
+        FileSystemUtil::mkdirIfNotExists(dirname($headPath));
         file_put_contents($headPath, $repositoryInfo['head']->getCommitHash().PHP_EOL);
 
         $this->manager->getRefReader()
