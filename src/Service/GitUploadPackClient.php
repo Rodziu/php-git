@@ -178,9 +178,18 @@ readonly class GitUploadPackClient
         FileSystemUtil::mkdirIfNotExists($dir);
 
         $tempPackPath = $dir.DIRECTORY_SEPARATOR.'pack-hash.pack';
+        $pack = explode("\n", $response->getBody()->getContents());
+
+        do {
+            $line = array_shift($pack);
+        } while (str_starts_with($line, '00'));
+
+        array_unshift($pack, $line);
+        $pack = implode("\n", $pack);
+
         file_put_contents(
             $tempPackPath,
-            explode("\n", $response->getBody()->getContents(), 2)[1]
+            $pack
         );
         $hash = (new Pack($tempPackPath))
             ->getChecksum();
